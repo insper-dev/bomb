@@ -1,0 +1,160 @@
+flowchart TD
+    %% Main Flow
+    Start([Iniciar Jogo]) --> InitialScreen["Tela Inicial
+    fa:fa-gamepad"]
+
+    %% Authentication Flow
+    subgraph "Autenticação"
+        InitialScreen --> CheckCredentials{"Tem Conta?
+        fa:fa-user-check"}
+        CheckCredentials -->|Não| SignUp["Cadastro/Login
+        fa:fa-user-plus"]
+        CheckCredentials -->|Sim| MainMenu["Menu Principal
+        fa:fa-home"]
+        SignUp --> AuthAPI[/"POST /api/auth
+        fa:fa-server"/]
+        AuthAPI --> MainMenu
+    end
+
+    %% Main Menu Options
+    MainMenu --> UserConfig["Configurações
+    fa:fa-user-cog"]
+    MainMenu --> GameModeSelection["Jogar
+    fa:fa-play"]
+    MainMenu --> LogOut["Sair da Conta
+    fa:fa-sign-out-alt"]
+    LogOut --> InitialScreen
+
+    %% User Configuration
+    subgraph "Configurações do Usuário"
+        UserConfig --> UsernameConfig["Definir Username
+        fa:fa-user-edit"]
+        UserConfig --> SkinSelection["Selecionar Skin
+        fa:fa-palette"]
+
+        UsernameConfig --> CheckUsername{Disponível?}
+        CheckUsername -->|Não| UsernameConfig
+        CheckUsername -->|Sim| SaveUsername[/"POST /api/user/username
+        fa:fa-save"/]
+
+        SkinSelection --> GetSkins[/"GET /api/skins
+        fa:fa-download"/]
+        GetSkins --> DisplaySkins[Exibir Skins Disponíveis]
+        DisplaySkins --> SelectSkin[Selecionar Skin]
+        SelectSkin --> SaveSkin[/"POST /api/user/skin
+        fa:fa-save"/]
+
+        SaveUsername --> BackToMain1[Voltar ao Menu]
+        SaveSkin --> BackToMain1
+        BackToMain1 -.-> MainMenu
+    end
+
+    %% Game Mode Selection
+    GameModeSelection --> OfflineMode["Jogar Offline
+    fa:fa-robot"]
+    GameModeSelection --> OnlineMode["Jogar Online
+    fa:fa-globe"]
+
+    %% Game Setup
+    subgraph "Configuração de Jogo"
+        %% Offline Setup
+        OfflineMode --> BotConfig["Configurar Bots
+        fa:fa-sliders-h"]
+        BotConfig --> StartOfflineGame["Iniciar Jogo Offline
+        fa:fa-play"]
+
+        %% Online Setup
+        OnlineMode --> JoinQueue[/"POST /api/matchmaking/join
+        fa:fa-server"/]
+        JoinQueue --> WaitingForMatch["Aguardando Partida
+        fa:fa-hourglass"]
+        WaitingForMatch --> MatchFound{Partida
+        Encontrada?}
+        MatchFound -->|Não| WaitingForMatch
+        MatchFound -->|Sim| JoinRoom[/"WS Conectar
+        /ws/game/{room_id}
+        fa:fa-plug"/]
+        JoinRoom --> StartOnlineGame[Iniciar Jogo Online]
+    end
+
+    StartOfflineGame --> GameInitialization["Inicialização do Jogo
+    fa:fa-play"]
+    StartOnlineGame --> GameInitialization
+
+    %% Game Mechanics
+    subgraph "Mecânica do Jogo"
+        GameInitialization --> MapGeneration["Gerar Mapa
+        fa:fa-map"]
+        MapGeneration --> PlaceRandomWalls[Colocar Paredes Aleatórias]
+        PlaceRandomWalls --> GameLoop["Loop do Jogo
+        fa:fa-sync"]
+
+        GameLoop --> PlayerActions["Ações do Jogador
+        fa:fa-running"]
+        GameLoop --> ProcessPowerups["Processar Power-ups
+        fa:fa-star"]
+        GameLoop --> ProcessBombs["Processar Bombas
+        fa:fa-bomb"]
+        GameLoop --> ToxicGasUpdate["Atualizar Gás Tóxico
+        fa:fa-skull"]
+
+        PlayerActions --> MovePlayer[Mover Jogador]
+        PlayerActions --> PlaceBomb[Colocar Bomba]
+
+        ToxicGasUpdate --> ShrinkArena[Diminuir Área de Jogo]
+
+        GameLoop --> CheckOnlineMode{Modo Online?}
+        CheckOnlineMode -->|Sim| SyncGameState[/"WS Sincronizar Estado
+        do Jogo
+        fa:fa-exchange-alt"/]
+        SyncGameState --> GameLoop
+        CheckOnlineMode -->|Não| GameLoop
+
+        GameLoop --> CheckGameEnd{Jogo
+        Terminou?}
+        CheckGameEnd -->|Não| GameLoop
+        CheckGameEnd -->|Sim| DetermineWinner["Determinar Vencedor
+        fa:fa-trophy"]
+    end
+
+    %% Power-ups
+    subgraph "Power-ups"
+        ProcessPowerups --> ActivatePowerup[Ativar Power-up]
+        ActivatePowerup --> BombRange["Aumentar Alcance
+        fa:fa-expand"]
+        ActivatePowerup --> BombPower["Aumentar Poder
+        fa:fa-bolt"]
+        ActivatePowerup --> BombDelay["Reduzir Delay
+        fa:fa-clock"]
+        ActivatePowerup --> JokerPowerup["Coringa
+        fa:fa-bomb"]
+        ActivatePowerup --> Shield["Escudo
+        fa:fa-shield-alt"]
+        ActivatePowerup --> ExtraLife["Vida Extra
+        fa:fa-heart"]
+        ActivatePowerup --> BombPush["Empurrar Bomba
+        fa:fa-shoe-prints"]
+        ActivatePowerup --> BombSpeed["Velocidade de Explosão
+        fa:fa-fire"]
+    end
+
+    %% Post Game
+    subgraph "Pós-Jogo"
+        DetermineWinner --> GameOver["Tela de Game Over
+        fa:fa-stop"]
+        GameOver --> Leaderboard["Mostrar Leaderboard
+        fa:fa-list-ol"]
+        Leaderboard --> UpdateStats[/"POST /api/stats/update
+        fa:fa-server"/]
+        UpdateStats --> PlayAgain{Jogar
+        Novamente?}
+
+        PlayAgain -->|Sim, Mesmo Jogador| CheckPlayerAvailable{Jogador
+        Disponível?}
+        CheckPlayerAvailable -->|Sim| GameInitialization
+        CheckPlayerAvailable -->|Não| MainMenu
+
+        PlayAgain -->|Sim, Novo Jogo| GameModeSelection
+        PlayAgain -->|Não| BackToMain2[Voltar ao Menu]
+        BackToMain2 -.-> MainMenu
+    end
