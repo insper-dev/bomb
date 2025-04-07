@@ -6,6 +6,11 @@ class Settings(BaseSettings):
     port: int | None = 8000
     secret_key: str = "vrau-easter-egg"
 
+    title: str = "Lara Bomb"
+    width: int = 800
+    height: int = 600
+    fps: int = 60
+
     class Config:
         env_file = ".env"
 
