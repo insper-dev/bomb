@@ -21,35 +21,33 @@ class BaseScene(ABC):
         self.next_scene: BaseScene | None = None
         self.components = []
 
+    @abstractmethod
     def handle_event(self, event: pygame.event.Event) -> None:
         """
-        Process Pygame events.
+        Handle events.
 
         Args:
             event: Event to be processed
         """
-        # delegate event handling to components
-        for component in self.components:
-            if hasattr(component, "handle_event"):
-                component.handle_event(event)
+        raise NotImplementedError
 
-    # TODO: this approach is temporary until is define the logic sytax for the "scene components"
     @abstractmethod
+    def render(self) -> None:
+        """
+        Render the scene (draw on the screen).
+
+        Args:
+            app: Client App
+        """
+        raise NotImplementedError
+
     def update(self) -> None:
         """Update the scene logic."""
-        # The idea os this function is to delagate the update process to the scene components
-        # That means that it dont need to be overrided by child classes
 
-        # TODO: use the self.app defined to change the global state / current_scene.
-        for component in self.components:
-            if hasattr(component, "update"):
-                component.update()
+        for event in pygame.event.get():
+            self.handle_event(event)
 
-        # Verifica se deve mudar para próxima cena
-        if self.next_scene:
-            # TODO: implement the change scen process
-            # self.app.change_scene(self.next_scene)
-            self.next_scene = None
+        self.render()
 
     # TODO: type these functions
     def add_component(self, component: ...) -> None:
