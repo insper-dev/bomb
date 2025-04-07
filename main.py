@@ -1,5 +1,8 @@
 import argparse
 
+from core.abstract import App
+from core.config import get_settings
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bomberman Online - Cliente/Servidor")
@@ -13,20 +16,19 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    apps = {
-        "client": "client.app:main",
-        "server": "server.app:main",
-    }
+    app_cls: type[App] | None = None
+    if args.mode == "client":
+        from client.app import ClientApp
 
-    app = apps.get(args.mode)
-    if app is None:
-        raise ValueError(f"Modo inválido: {args.mode}. Use 'client' ou 'server'.")
+        app_cls = ClientApp
+    elif args.mode == "server":
+        from server.app import ServerApp
 
-    # import the module and function dynamically
-    module_name, function_name = app.split(":")
-    module = __import__(module_name, fromlist=[function_name])
-    function = getattr(module, function_name)
-    function()
+        app_cls = ServerApp
+
+    if app_cls is not None:
+        app = app_cls(get_settings())
+        app.run()
 
 
 if __name__ == "__main__":
