@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     port: int | None = 8000
     secret_key: str = "vrau-easter-egg"
     debug: bool = False
+    access_token_expire_minutes: int = 60 * 24 * 7
+    algorithm: str = "HS256"
 
     title: str = "Lara Bomb"
     width: int = 800
