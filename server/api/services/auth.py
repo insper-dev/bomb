@@ -47,13 +47,13 @@ class AuthService:
         """
         to_encode = data.copy()
         expire = (
-            datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
+            datetime.now(UTC) + timedelta(minutes=settings.server_access_token_expire_minutes)
         ).timestamp()
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(
             to_encode,
-            settings.secret_key,
-            algorithm=settings.algorithm,
+            settings.server_secret_key,
+            algorithm=settings.server_algorithm,
         )
         return encoded_jwt
 
@@ -64,8 +64,8 @@ class AuthService:
         try:
             decoded_token = jwt.decode(
                 token,
-                settings.secret_key,
-                algorithms=[settings.algorithm],
+                settings.server_secret_key,
+                algorithms=[settings.server_algorithm],
             )
             return (
                 decoded_token

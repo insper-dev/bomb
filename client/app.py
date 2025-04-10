@@ -23,9 +23,7 @@ class ClientApp(App):
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.event_handler = None
-        # TODO: settings.host is a enviroment variable just to the client. The server should user
-        # another one to "bind"
-        self.api_client = APIClient(self.settings.host)
+        self.api_client = APIClient(self.settings.server_endpoint)
         self.auth_service = AuthService(self)
         self.ws_client = None
 
@@ -36,14 +34,16 @@ class ClientApp(App):
     def run(self) -> None:
         pygame.init()
 
-        pygame.display.set_caption(self.settings.title)
-        self.screen = pygame.display.set_mode([self.settings.width, self.settings.height])
+        pygame.display.set_caption(self.settings.client_title)
+        self.screen = pygame.display.set_mode(
+            [self.settings.client_width, self.settings.client_height]
+        )
 
         self.clock = pygame.time.Clock()
         self.running = True
 
         while self.running:
-            self.clock.tick(self.settings.fps)
+            self.clock.tick(self.settings.client_fps)
 
             scene = SCENES_MAP[self.current_scene]
             # a scene is responsible to update the current state, change scenes, etc.

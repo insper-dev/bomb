@@ -26,8 +26,8 @@ class ServerApp(App):
             title="Lara Bomb Online Server",
             description="Server for Lara Bomb Online",
             version="0.0.2",
-            docs_url="/docs" if self.settings.debug else None,
-            redoc_url="/redoc" if self.settings.debug else None,
+            docs_url="/docs" if self.settings.server_debug else None,
+            redoc_url="/redoc" if self.settings.server_debug else None,
             lifespan=lifespan,
         )
 
@@ -46,4 +46,6 @@ class ServerApp(App):
         self.app.include_router(ws_router, prefix="/ws")
 
     def run(self) -> None:
-        uvicorn.run(self.app, host=self.settings.host, port=self.settings.port or 8000)
+        uvicorn.run(
+            self.app, host=self.settings.server_bind, port=self.settings.server_port or 8000
+        )

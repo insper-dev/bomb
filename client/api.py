@@ -19,15 +19,15 @@ logger = logging.getLogger(__name__)
 class APIClient:
     """Async API client for communication with the server."""
 
-    def __init__(self, base_url: str, auth_token: str | None = None) -> None:
+    def __init__(self, endpoint: str, auth_token: str | None = None) -> None:
         """
         Initialize a new instance of the APIClient class.
 
         Args:
-            base_url: Base URL of the API
+            endpoint: Base URL of the API
         """
         self.client = httpx.Client(
-            base_url=base_url,
+            base_url=f"https://{endpoint}/api",
             headers={"Content-Type": "application/json", "User-Agent": "Pygame Client :D"},
         )
         self.auth_token = auth_token
