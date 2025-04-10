@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115.12",
+    "prisma>=0.15.0",
     "pydantic>=2.11.2",
     "pydantic-settings>=2.8.1",
     "pygame>=2.6.1",
