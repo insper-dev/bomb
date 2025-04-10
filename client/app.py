@@ -4,7 +4,9 @@ Cliente Bomberman Online - Factory da Aplicação
 
 import pygame
 
+from client.api import APIClient
 from client.scenes import SCENES_MAP, Scenes
+from client.services import AuthService
 from core.abstract import App
 from core.config import Settings
 
@@ -16,11 +18,15 @@ class ClientApp(App):
     clock: pygame.time.Clock
     current_scene: Scenes = Scenes.START
     running: bool = False
+    auth_service: AuthService
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.event_handler = None
-        self.api_client = None
+        # TODO: settings.host is a enviroment variable just to the client. The server should user
+        # another one to "bind"
+        self.api_client = APIClient(self.settings.host)
+        self.auth_service = AuthService(self)
         self.ws_client = None
 
     @property
