@@ -4,15 +4,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from prisma.models import User
+from prisma.partials import CurrentUser
 
-from core.models.auth import Token, UserRegister
+from core.models.auth import Token, UserSignup
 from server.api.dependencies import CurrentUserDep, auth_service
 
 router = APIRouter(tags=["Authentication"])
 
 
-@router.post("/register", response_model=Token)
-async def register(user_data: UserRegister):  # noqa: ANN201
+@router.post("/signup", response_model=Token)
+async def signup(user_data: UserSignup):  # noqa: ANN201
     existing_username = await User.prisma().find_unique(where={"username": user_data.username})
     if existing_username:
         raise HTTPException(
@@ -56,3 +57,8 @@ async def login(credentials: Annotated[OAuth2PasswordRequestForm, Depends()]):  
 async def logout(user: CurrentUserDep) -> dict:
     await User.prisma().update(where={"id": user.id}, data={"status": "OFFLINE"})
     return {"message": "Successfully logged out"}
+
+
+@router.get("/me", response_model=CurrentUser)
+async def me(user: CurrentUserDep) -> User:
+    return user
