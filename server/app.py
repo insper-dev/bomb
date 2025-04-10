@@ -8,9 +8,6 @@ from prisma import Prisma
 from core.abstract import App
 from core.config import Settings
 
-from .api import router as api_router
-from .ws import router as ws_router
-
 db = Prisma(auto_register=True)
 
 
@@ -42,7 +39,10 @@ class ServerApp(App):
             allow_headers=["*"],
         )
 
-        self.app.include_router(api_router, prefix="/api")
+        from .api.auth import router as auth_router
+        from .ws import router as ws_router
+
+        self.app.include_router(auth_router, prefix="/api/auth")
         self.app.include_router(ws_router, prefix="/ws")
 
     def run(self) -> None:

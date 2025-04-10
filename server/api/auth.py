@@ -1,22 +1,18 @@
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from prisma.models import User
 
-from core.models.auth import Token, UserLogin, UserRegister
+from core.models.auth import Token, UserRegister
 from server.api.dependencies import CurrentUserDep, auth_service
 
 router = APIRouter(tags=["Authentication"])
 
 
 @router.post("/register", response_model=Token)
-async def register(user_data: UserRegister) -> dict:
-    existing_user = await User.prisma().find_unique(where={"email": user_data.email})
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
-        )
-
+async def register(user_data: UserRegister):  # noqa: ANN201
     existing_username = await User.prisma().find_unique(where={"username": user_data.username})
     if existing_username:
         raise HTTPException(
@@ -27,20 +23,19 @@ async def register(user_data: UserRegister) -> dict:
     user = await User.prisma().create(
         {
             "username": user_data.username,
-            "email": user_data.email,
             "password": hashed_password,
             "status": "OFFLINE",
         }
     )
 
-    access_token = auth_service.create_access_token({"sub": user.email})
+    access_token = auth_service.create_access_token({"sub": user.username})
 
     return {"access_token": access_token}
 
 
 @router.post("/login", response_model=Token)
-async def login(credentials: UserLogin) -> dict:
-    user = await auth_service.authenticate_user(credentials.email, credentials.password)
+async def login(credentials: Annotated[OAuth2PasswordRequestForm, Depends()]):  # noqa: ANN201
+    user = await auth_service.authenticate_user(credentials.username, credentials.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -52,7 +47,7 @@ async def login(credentials: UserLogin) -> dict:
         where={"id": user.id}, data={"lastLoginAt": datetime.now(UTC), "status": "ONLINE"}
     )
 
-    access_token = auth_service.create_access_token({"sub": user.email})
+    access_token = auth_service.create_access_token({"sub": user.username})
 
     return {"access_token": access_token}
 

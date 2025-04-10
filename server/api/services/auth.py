@@ -32,11 +32,11 @@ class AuthService:
         except VerifyMismatchError:
             return False
 
-    async def authenticate_user(self, email: str, password: str) -> User | None:
+    async def authenticate_user(self, username: str, password: str) -> User | None:
         """
-        Authenticates a user by verifying email and password.
+        Authenticates a user by verifying username and password.
         """
-        user = await User.prisma().find_unique(where={"email": email})
+        user = await User.prisma().find_unique(where={"username": username})
         if not user or not self.verify_password(password, user.password):
             return None
         return user
@@ -95,11 +95,11 @@ class AuthService:
         if payload is None:
             raise credentials_exception
 
-        email: str = payload.get("sub")  # type: ignore
-        if email is None:
+        username: str = payload.get("sub")  # type: ignore
+        if username is None:
             raise credentials_exception
 
-        user = await User.prisma().find_unique(where={"email": email})
+        user = await User.prisma().find_unique(where={"username": username})
         if user is None:
             raise credentials_exception
 

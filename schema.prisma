@@ -1,6 +1,7 @@
 generator client {
-  provider             = "prisma-client-py"
-  recursive_type_depth = 5
+  provider               = "prisma-client-py"
+  partial_type_generator = "core/models/partials.py"
+  recursive_type_depth   = 5
 }
 
 datasource db {
@@ -13,7 +14,6 @@ model User {
   id          String    @id @default(uuid())
   username    String    @unique
   password    String // HASH
-  email       String    @unique
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   lastLoginAt DateTime?
