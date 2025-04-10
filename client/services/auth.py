@@ -1,12 +1,13 @@
 import json
 
+from prisma.partials import CurrentUser
+
 from client.services.base import ServiceBase
 from core.constants import SESSION_FILE
 
 
 class AuthService(ServiceBase):
-    # TODO: use model validation, like CurrentUser from prisma.partials.
-    current_user: dict | None = None
+    current_user: CurrentUser | None = None
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -80,7 +81,7 @@ class AuthService(ServiceBase):
             return False
 
         if request_status.data is not None:
-            self.current_user = request_status.data
+            self.current_user = CurrentUser.model_validate(request_status.data)
         else:
             self.current_user = None
 
