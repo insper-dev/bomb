@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     host: str = "lara-bomb.insper.dev"
     port: int | None = 8000
     secret_key: str = "vrau-easter-egg"
+    debug: bool = False
 
     title: str = "Lara Bomb"
     width: int = 800
