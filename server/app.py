@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prisma import Prisma
 
 from core.abstract import App
 from core.config import Settings
@@ -10,11 +11,14 @@ from core.config import Settings
 from .api import router as api_router
 from .ws import router as ws_router
 
+db = Prisma(auto_register=True)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ANN201
-    # TODO: initialize prisma database.
+    await db.connect()
     yield
+    await db.disconnect()
 
 
 class ServerApp(App):
