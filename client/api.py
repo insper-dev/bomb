@@ -40,7 +40,9 @@ class APIClient:
     def set_auth_token(self, token: str | None) -> None:
         self.auth_token = token
 
-    def _make_request(self, request_id: str, method: str, endpoint: str, data: dict | None) -> None:
+    def _make_request(
+        self, request_id: str, method: str, endpoint: str, data: dict | None, headers: dict | None
+    ) -> None:
         """
         Do a request to the server on a separate thread
 
@@ -49,8 +51,9 @@ class APIClient:
             method: HTTP method (GET, POST, PUT, DELETE)
             endpoint: API Endpoint
             data: Data to send
+            headers: Headers to send
         """
-        headers = {}
+        headers = headers or {}
 
         if self.auth_token:
             headers["Authorization"] = f"Bearer {self.auth_token}"
@@ -95,13 +98,14 @@ class APIClient:
         endpoint: str,
         method: Literal["GET", "POST", "PUT", "DELETE"],
         data: dict | None = None,
+        headers: dict | None = None,
     ) -> str:
         request_id = str(uuid.uuid4())
 
         # Inicia thread para requisição
         thread = threading.Thread(
             target=self._make_request,
-            args=(request_id, method, endpoint, data),
+            args=(request_id, method, endpoint, data, headers),
         )
         thread.daemon = True
         thread.start()
