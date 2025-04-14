@@ -6,7 +6,7 @@ import pygame
 
 from client.api import APIClient
 from client.scenes import SCENES_MAP, Scenes
-from client.services import AuthService
+from client.services import AuthService, MatchmakingService
 from core.abstract import App
 from core.config import Settings
 
@@ -19,12 +19,14 @@ class ClientApp(App):
     current_scene: Scenes = Scenes.START
     running: bool = False
     auth_service: AuthService
+    matchmaking_service: MatchmakingService
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.event_handler = None
         self.api_client = APIClient(self.settings.server_endpoint)
         self.auth_service = AuthService(self)
+        self.matchmaking_service = MatchmakingService(self)
         self.ws_client = None
 
     @property
