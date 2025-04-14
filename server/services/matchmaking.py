@@ -3,11 +3,11 @@
 import asyncio
 import logging
 import time
-import uuid
 
 from fastapi import WebSocket
 
 from core.models.matchmaking import QueuedPlayer
+from server.services.game import game_service
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +145,7 @@ class MatchmakingQueue:
 
             except Exception as e:
                 logger.error(f"Error processing matchmaking queue: {e}")
-                # Continue the loop even in case of an error
+        # Continue the loop even in case of an error
 
     async def _process_queue(self) -> None:
         """Processes the matchmaking queue to find matches."""
@@ -165,19 +165,15 @@ class MatchmakingQueue:
                 player2 = players[i + 1]
 
                 # Create a match for the two players
-                try:
-                    match_id = await self._create_match([player1, player2])
+                match_id = await self._create_match([player1, player2])
 
-                    # If the match was created successfully, add the players to matched
-                    if match_id:
-                        matched_players.extend([player1, player2])
+                # If the match was created successfully, add the players to matched
+                if match_id:
+                    matched_players.extend([player1, player2])
 
-                        # Notify the players about the match
-                        await self._notify_match_found(player1, player2, match_id)
-                        logger.info(f"Match found: {player1} vs {player2} (match_id: {match_id})")
-
-                except Exception as e:
-                    logger.error(f"Error creating match: {e}")
+                    # Notify the players about the match
+                    await self._notify_match_found(player1, player2, match_id)
+                    logger.info(f"Match found: {player1} vs {player2} (match_id: {match_id})")
 
                 # Move to the next pair
                 i += 2
@@ -196,17 +192,12 @@ class MatchmakingQueue:
         Returns:
             str: ID of the created match or None in case of error
         """
-        try:
-            # Generate a unique match ID (using UUID)
-            match_id = str(uuid.uuid4())
-
-            # In a real implementation, this would create the actual match
-            # and initialize the game state
-
-            return match_id
-        except Exception as e:
-            logger.error(f"Error creating match: {e}")
-            return None
+        # try:
+        match_id = await game_service.create_game(player_ids)
+        return match_id
+        # except Exception as e:
+        #     logger.error(f"Error creating match: {e}")
+        #     return None
 
     async def _notify_match_found(self, player1_id: str, player2_id: str, match_id: str) -> None:
         """

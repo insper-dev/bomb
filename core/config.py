@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     server_algorithm: str = "HS256"
 
     server_endpoint: str = "lara-bomb.insper.dev"
+    server_endpoint_ssl: bool = False
 
     client_title: str = "Lara Bomb"
     client_width: int = 800

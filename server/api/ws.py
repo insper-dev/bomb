@@ -6,10 +6,98 @@ from prisma.models import User
 
 from core.models.ws import WebSocketCloseCode
 from server.api.dependencies import auth_service
+from server.services.game import game_service
 from server.services.matchmaking import matchmaking_queue
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Game WebSockets"])
+
+
+@router.websocket("/game/{game_id}")
+async def game_websocket(websocket: WebSocket, game_id: str) -> None:
+    user = None
+    connection_accepted = False
+
+    try:
+        # Autentica o usuário primeiro
+        user = await auth_service.get_current_user_ws(websocket)
+        user_id = user.id
+
+        game = game_service.get_game(game_id)
+
+        if not game:
+            logger.warning(f"Jogo {game_id} não encontrado")
+            await websocket.close(code=WebSocketCloseCode.ERROR)
+            return
+
+        # Verifica se o usuário faz parte do jogo
+        if user_id not in game.players:
+            logger.warning(f"Usuário {user_id} não faz parte do jogo {game_id}")
+            await websocket.close(code=WebSocketCloseCode.ERROR)
+            return
+
+        # Aceita a conexão e adiciona ao jogo
+        await websocket.accept()
+        connection_accepted = True
+
+        success = await game_service.add_player_connection(user_id, game_id, websocket)
+        if not success:
+            await websocket.close(code=WebSocketCloseCode.ERROR)
+            return
+
+        # Atualiza o status do usuário para indicar que está em um jogo
+        await User.prisma().update(where={"id": user_id}, data={"status": "IN_GAME"})
+
+        # Processa mensagens enquanto a conexão estiver ativa
+        while connection_accepted:
+            try:
+                message = await websocket.receive_json()
+
+                # Processa ação do jogador
+                await game_service.handle_player_action(user_id, message)
+
+            except json.JSONDecodeError:
+                logger.warning(f"JSON inválido do usuário {user_id}")
+                continue
+            except WebSocketDisconnect:
+                logger.info(f"WebSocket desconectado para o usuário {user_id}")
+                connection_accepted = False
+                break
+            except Exception as e:
+                logger.error(f"Erro no websocket do jogo: {e}")
+                if connection_accepted:
+                    try:
+                        await websocket.send_json(
+                            {"type": "error", "message": "Erro ao processar mensagem"}
+                        )
+                    except Exception:
+                        connection_accepted = False
+                        break
+
+    except WebSocketDisconnect:
+        logger.info(
+            f"WebSocket desconectado durante setup para o usuário "
+            f"{getattr(user, 'username', 'DESCONHECIDO')} no jogo {game_id}"
+        )
+    except Exception as e:
+        logger.error(f"Erro inesperado no websocket do jogo: {e}")
+        if connection_accepted:
+            try:
+                await websocket.close(code=WebSocketCloseCode.ERROR)
+            except Exception:
+                pass
+
+    finally:
+        # Limpeza
+        if user:
+            # Atualiza o status do usuário de volta para ONLINE
+            try:
+                await User.prisma().update(where={"id": user.id}, data={"status": "ONLINE"})
+            except Exception as status_err:
+                logger.error(f"Erro ao atualizar status do usuário: {status_err}")
+
+            # Remove do jogo
+            await game_service.remove_player_connection(user.id)
 
 
 @router.websocket("/matchmaking")
