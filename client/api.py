@@ -19,16 +19,19 @@ logger = logging.getLogger(__name__)
 class APIClient:
     """Async API client for communication with the server."""
 
-    def __init__(self, endpoint: str, auth_token: str | None = None) -> None:
+    def __init__(self, endpoint: str, use_ssl: bool, auth_token: str | None = None) -> None:
         """
         Initialize a new instance of the APIClient class.
 
         Args:
             endpoint: Base URL of the API
+            use_ssl: Whether to use SSL
+            auth_token: Authentication token
         """
+        protocol = "https" if use_ssl else "http"
         self.client = httpx.Client(
-            base_url=f"https://{endpoint}/api",
-            headers={"Content-Type": "application/json", "User-Agent": "Pygame Client :D"},
+            base_url=f"{protocol}://{endpoint}/api",
+            headers={"User-Agent": "Pygame Client :D"},
         )
         self.auth_token = auth_token
 
@@ -63,9 +66,9 @@ class APIClient:
             if method == "GET":
                 response = self.client.get(endpoint, headers=headers)
             elif method == "POST":
-                response = self.client.post(endpoint, json=data, headers=headers)
+                response = self.client.post(endpoint, data=data, headers=headers)
             elif method == "PUT":
-                response = self.client.put(endpoint, json=data, headers=headers)
+                response = self.client.put(endpoint, data=data, headers=headers)
             elif method == "DELETE":
                 response = self.client.delete(endpoint, headers=headers)
             else:

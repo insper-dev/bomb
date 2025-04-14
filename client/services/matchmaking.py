@@ -182,8 +182,7 @@ class MatchmakingService(ServiceBase):
             return
 
         try:
-            # TODO: mover protocolo para dentro de self.app.settings
-            protocol = "ws" if self.app.settings.server_debug else "wss"
+            protocol = "wss" if self.app.settings.server_endpoint_ssl else "ws"
             uri = f"{protocol}://{self.app.settings.server_endpoint}/ws/matchmaking?token={token}"
 
             async with websockets.connect(uri) as websocket:
