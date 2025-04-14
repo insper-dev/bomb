@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import TYPE_CHECKING
 
 import pygame
@@ -68,3 +69,10 @@ class BaseScene(ABC):
         """
         if component in self.components:
             self.components.remove(component)
+
+
+class Scenes(str, Enum):
+    START = "start"
+    MATCHMAKING = "matchmaking"
+    GAME = "game"
+    LOGIN = "login"
