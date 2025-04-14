@@ -6,7 +6,7 @@ import pygame
 
 from client.api import APIClient
 from client.scenes import SCENES_MAP, Scenes
-from client.services import AuthService, MatchmakingService
+from client.services import AuthService, GameService, MatchmakingService
 from core.abstract import App
 from core.config import Settings
 
@@ -20,13 +20,17 @@ class ClientApp(App):
     running: bool = False
     auth_service: AuthService
     matchmaking_service: MatchmakingService
+    game_service: GameService
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.event_handler = None
-        self.api_client = APIClient(self.settings.server_endpoint)
+        self.api_client = APIClient(
+            self.settings.server_endpoint, self.settings.server_endpoint_ssl
+        )
         self.auth_service = AuthService(self)
         self.matchmaking_service = MatchmakingService(self)
+        self.game_service = GameService(self)
         self.ws_client = None
 
     @property
@@ -44,12 +48,17 @@ class ClientApp(App):
         self.clock = pygame.time.Clock()
         self.running = True
 
+        past_scene = self.current_scene
+        scene = SCENES_MAP[self.current_scene](self)
         while self.running:
             self.clock.tick(self.settings.client_fps)
 
-            scene = SCENES_MAP[self.current_scene]
+            if self.current_scene != past_scene:
+                past_scene = self.current_scene
+                scene = SCENES_MAP[self.current_scene](self)
+
             # a scene is responsible to update the current state, change scenes, etc.
-            scene(self).update()
+            scene.update()
 
             pygame.display.flip()
 
