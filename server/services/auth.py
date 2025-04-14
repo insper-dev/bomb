@@ -2,12 +2,13 @@ from datetime import UTC, datetime, timedelta
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from prisma.models import User
 
 from core.config import get_settings
+from core.models.ws import WebSocketCloseCode
 
 settings = get_settings()
 
@@ -104,3 +105,26 @@ class AuthService:
             raise credentials_exception
 
         return user
+
+    async def get_current_user_ws(self, websocket: WebSocket) -> User:
+        """Authenticate user via WebSocket token parameter
+
+        Args:
+            websocket: The WebSocket connection
+
+        Returns:
+            User: The authenticated user
+
+        Raises:
+            WebSocketDisconnect: If authentication fails
+        """
+        token = websocket.query_params.get("token")
+        if not token:
+            await websocket.close(code=WebSocketCloseCode.UNAUTHORIZED)
+            raise WebSocketDisconnect(code=WebSocketCloseCode.UNAUTHORIZED)
+
+        try:
+            return await self.get_current_user(token)
+        except Exception as e:
+            await websocket.close(code=WebSocketCloseCode.UNAUTHORIZED)
+            raise WebSocketDisconnect(code=WebSocketCloseCode.UNAUTHORIZED) from e

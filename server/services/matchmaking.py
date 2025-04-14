@@ -3,39 +3,13 @@
 import asyncio
 import logging
 import time
-from dataclasses import dataclass
-from enum import Enum, auto
+import uuid
 
 from fastapi import WebSocket
 
+from core.models.matchmaking import QueuedPlayer
+
 logger = logging.getLogger(__name__)
-
-
-class PlayerStatus(Enum):
-    """Status of a player in the matchmaking queue"""
-
-    QUEUED = auto()  # Player is waiting in queue
-    MATCHED = auto()  # Player has been matched
-    TIMED_OUT = auto()  # Player waited too long
-
-
-@dataclass
-class QueuedPlayer:
-    """Represents a player in the matchmaking queue"""
-
-    user_id: str
-    joined_at: float
-    status: PlayerStatus = PlayerStatus.QUEUED
-    match_id: str | None = None
-    opponent_id: str | None = None
-    estimated_wait: int = 0
-    position: int = 0
-    wait_time: int = 0
-
-    @property
-    def wait_duration(self) -> float:
-        """Calculate how long the player has been waiting"""
-        return time.time() - self.joined_at
 
 
 class MatchmakingQueue:
@@ -223,9 +197,13 @@ class MatchmakingQueue:
             str: ID of the created match or None in case of error
         """
         try:
-            # TODO: use the game state management system to create the match
-            # match_id = await game_state.create_match(player_ids)
-            return "..."  # match_id
+            # Generate a unique match ID (using UUID)
+            match_id = str(uuid.uuid4())
+
+            # In a real implementation, this would create the actual match
+            # and initialize the game state
+
+            return match_id
         except Exception as e:
             logger.error(f"Error creating match: {e}")
             return None
@@ -272,6 +250,16 @@ class MatchmakingQueue:
             # Send the data via WebSocket
             websocket = self.connections[player_id]
             await websocket.send_json(data)
+
+            # If this is a match found notification, close the connection properly
+            if data.get("type") == "match_found":
+                try:
+                    # Remove from connections before closing to prevent further attempts to send
+                    self.connections.pop(player_id, None)
+                    await websocket.close(code=4000)  # MATCH_FOUND code
+                except Exception as close_error:
+                    logger.error(f"Error closing WebSocket for player {player_id}: {close_error}")
+
         except Exception as e:
             logger.error(f"Error notifying player {player_id}: {e}")
             # Remove the connection in case of error
@@ -291,28 +279,30 @@ class MatchmakingQueue:
 
             # Update each player
             for i, player_id in enumerate(players):
-                # Calculate wait time and position
-                position = i + 1
-                wait_time = time.time() - self.queue[player_id].joined_at
-                estimated_wait = self._estimate_wait_time(position)
+                # Only update if player is still in the queue and has a connection
+                if player_id in self.queue and player_id in self.connections:
+                    # Calculate wait time and position
+                    position = i + 1
+                    wait_time = time.time() - self.queue[player_id].joined_at
+                    estimated_wait = self._estimate_wait_time(position)
 
-                # Notify the player
-                await self._notify_player(
-                    player_id,
-                    {
-                        "type": "queue_update",
-                        "position": position,
-                        "wait_time": int(wait_time),
-                        "estimated_wait": estimated_wait,
-                        "queue_size": queue_size,
-                    },
-                )
+                    # Notify the player
+                    await self._notify_player(
+                        player_id,
+                        {
+                            "type": "queue_update",
+                            "position": position,
+                            "wait_time": int(wait_time),
+                            "estimated_wait": estimated_wait,
+                            "queue_size": queue_size,
+                        },
+                    )
 
-                # Check queue timeout
-                if wait_time > self.max_wait_time:
-                    # In a real system, this player could be paired with bots
-                    # or relax the matchmaking criteria
-                    pass
+                    # Check queue timeout
+                    if wait_time > self.max_wait_time:
+                        # In a real system, this player could be paired with bots
+                        # or relax the matchmaking criteria
+                        pass
 
     def _estimate_wait_time(self, position: int) -> int:
         """

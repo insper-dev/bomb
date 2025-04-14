@@ -7,6 +7,7 @@ from prisma import Prisma
 
 from core.abstract import App
 from core.config import Settings
+from server.services.matchmaking import matchmaking_queue
 
 db = Prisma(auto_register=True)
 
@@ -14,7 +15,11 @@ db = Prisma(auto_register=True)
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ANN201
     await db.connect()
+    await matchmaking_queue.start()
+
     yield
+
+    await matchmaking_queue.stop()
     await db.disconnect()
 
 
@@ -25,7 +30,7 @@ class ServerApp(App):
         self.app = FastAPI(
             title="Lara Bomb Online Server",
             description="Server for Lara Bomb Online",
-            version="0.0.2",
+            version="0.0.3",
             docs_url="/docs" if self.settings.server_debug else None,
             redoc_url="/redoc" if self.settings.server_debug else None,
             lifespan=lifespan,
@@ -40,7 +45,7 @@ class ServerApp(App):
         )
 
         from .api.auth import router as auth_router
-        from .ws import router as ws_router
+        from .api.ws import router as ws_router
 
         self.app.include_router(auth_router, prefix="/api/auth")
         self.app.include_router(ws_router, prefix="/ws")
