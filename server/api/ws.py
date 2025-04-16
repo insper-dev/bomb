@@ -6,6 +6,7 @@ import time
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from prisma.models import User
 
+from core.models.matchmaking import QueuedPlayer
 from core.models.ws import WebSocketCloseCode
 from server.api.dependencies import auth_service
 from server.services.game import game_service
@@ -107,10 +108,10 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
     user = None
     connection_accepted = False
     in_queue = False
-    heartbeat_task = None
+    last_activity = time.time()
 
     try:
-        # Authenticate user first
+        # Autenticação do usuário
         user = await auth_service.get_current_user_ws(websocket)
         user_id = user.id
 
@@ -118,14 +119,11 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
         connection_accepted = True
         logger.info(f"Matchmaking WebSocket connection established for user {user_id}")
 
-        # Create heartbeat task
-        heartbeat_task = asyncio.create_task(send_heartbeats(websocket, user_id))
-
         try:
-            # Update user status to indicate they're online
+            # Atualiza o status do usuário para online
             await User.prisma().update(where={"id": user_id}, data={"status": "ONLINE"})
 
-            # Wait for the first message (join) before processing
+            # Aguarda a primeira mensagem (join) antes do processamento
             first_message = await websocket.receive_json()
 
             if not isinstance(first_message, dict) or first_message.get("action") != "join_queue":
@@ -134,27 +132,31 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
                 )
                 return
 
-            # Add the player to the queue
+            # Adiciona o jogador à fila
             added = await matchmaking_queue.add_player(user_id, websocket)
             in_queue = added
+            last_activity = time.time()
 
             if not added:
                 await websocket.send_json(
-                    {"type": "error", "message": "Already in queue or other error"}
+                    {"type": "error", "message": "Failed to join queue, try again later"}
                 )
                 return
 
-            # Send confirmation of queue join
-            await websocket.send_json({"type": "success", "message": "Joined matchmaking queue"})
+            # Envia confirmação de entrada na fila
+            await websocket.send_json(
+                {"type": "success", "message": "Joined matchmaking queue", "timestamp": time.time()}
+            )
 
-            # Update user status to indicate they're in matchmaking
+            # Atualiza o status do usuário para indicar que está em matchmaking
             await User.prisma().update(where={"id": user_id}, data={"status": "MATCHMAKING"})
 
-            # While the player is in the queue, process messages
+            # Enquanto o jogador estiver na fila, processa mensagens
             while connection_accepted and in_queue:
                 try:
-                    # Set a timeout for receiving messages
+                    # Define um timeout para receber mensagens
                     message = await asyncio.wait_for(websocket.receive_json(), timeout=30.0)
+                    last_activity = time.time()
 
                     if not isinstance(message, dict):
                         logger.warning(f"Invalid message format from user {user_id}")
@@ -167,16 +169,20 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
                         continue
 
                     if action == "leave_queue":
-                        # Remove the player from the queue
+                        # Remove o jogador da fila
                         if in_queue:
                             await matchmaking_queue.remove_player(user_id)
                             in_queue = False
 
-                        # Update user status back to online
+                        # Atualiza o status do usuário de volta para online
                         await User.prisma().update(where={"id": user_id}, data={"status": "ONLINE"})
 
                         await websocket.send_json(
-                            {"type": "queue_left", "message": "Left matchmaking queue"}
+                            {
+                                "type": "queue_left",
+                                "message": "Left matchmaking queue",
+                                "timestamp": time.time(),
+                            }
                         )
 
                         await websocket.close(code=WebSocketCloseCode.LEAVE_QUEUE)
@@ -184,21 +190,49 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
                         return
 
                     elif action == "ping":
-                        # Respond to pings to keep the connection alive
+                        # Responde a pings para manter a conexão viva
                         await websocket.send_json(
-                            {"type": "pong", "timestamp": message.get("timestamp")}
+                            {"type": "pong", "timestamp": message.get("timestamp", time.time())}
                         )
 
-                    elif action == "reconnect":
-                        # Handle reconnection - update the connection
-                        logger.info(f"Player {user_id} reconnected to matchmaking")
-                        # Just update the connection in the matchmaking queue
-                        await matchmaking_queue.add_player(user_id, websocket)
+                    elif action == "status":
+                        # Consulta informações sobre a fila
+                        await websocket.send_json(
+                            {
+                                "type": "queue_info",
+                                "position": matchmaking_queue.queue.get(
+                                    user_id, QueuedPlayer(user_id=user_id, joined_at=0)
+                                ).position,
+                                "wait_time": int(
+                                    time.time()
+                                    - matchmaking_queue.queue.get(
+                                        user_id,
+                                        QueuedPlayer(user_id=user_id, joined_at=time.time()),
+                                    ).joined_at
+                                ),
+                                "queue_size": len(
+                                    [
+                                        p
+                                        for p in matchmaking_queue.queue
+                                        if p not in matchmaking_queue.matched_players
+                                    ]
+                                ),
+                                "timestamp": time.time(),
+                            }
+                        )
 
                 except TimeoutError:
-                    # No message received in timeout period, check if still connected
+                    # Nenhuma mensagem recebida no período de timeout, verifica se ainda ta connec
+                    # Se o último ping foi há muito tempo, encerre a conexão
+                    if time.time() - last_activity > 60:  # 1 minuto sem atividade
+                        logger.info(
+                            f"No activity for user {user_id} for 60 seconds, closing connection"
+                        )
+                        connection_accepted = False
+                        break
+
                     try:
-                        # Send a ping to check connection
+                        # Envia um ping para verificar a conexão
                         await websocket.send_json({"type": "ping", "timestamp": time.time()})
                     except Exception:
                         logger.info(f"Connection lost for user {user_id}")
@@ -217,10 +251,14 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
                     if connection_accepted:
                         try:
                             await websocket.send_json(
-                                {"type": "error", "message": "Error processing message"}
+                                {
+                                    "type": "error",
+                                    "message": "Error processing message",
+                                    "timestamp": time.time(),
+                                }
                             )
                         except Exception:
-                            # If sending fails, connection may be closed
+                            # Se o envio falhar, a conexão pode estar fechada
                             connection_accepted = False
                             break
                     else:
@@ -236,7 +274,7 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
             connection_accepted = False
 
     except WebSocketDisconnect:
-        # Already handled above
+        # Já tratado acima
         pass
     except Exception as e:
         logger.error(f"Unexpected error in matchmaking websocket: {e}")
@@ -247,38 +285,13 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
                 pass
 
     finally:
-        # Cancel heartbeat task if it exists
-        if heartbeat_task:
-            heartbeat_task.cancel()
-            try:
-                await heartbeat_task
-            except asyncio.CancelledError:
-                pass
-
-        # Ensure the player is removed from the queue if the connection is closed
+        # Garante que o jogador seja removido da fila se a conexão for fechada
         if user and in_queue:
             await matchmaking_queue.remove_player(user.id)
 
-        # Update user status back to ONLINE if we have a user
+        # Atualiza o status do usuário de volta para ONLINE se tivermos um usuário
         if user:
             try:
                 await User.prisma().update(where={"id": user.id}, data={"status": "ONLINE"})
             except Exception as status_err:
                 logger.error(f"Error updating user status: {status_err}")
-
-
-async def send_heartbeats(websocket: WebSocket, user_id: str) -> None:
-    """Send periodic heartbeats to keep the connection alive"""
-    try:
-        while True:
-            await asyncio.sleep(15.0)  # Send heartbeat every 15 seconds
-            try:
-                await websocket.send_json({"type": "heartbeat", "timestamp": time.time()})
-            except Exception as e:
-                logger.warning(f"Failed to send heartbeat to user {user_id}: {e}")
-                break
-    except asyncio.CancelledError:
-        # Task was cancelled, exit gracefully
-        pass
-    except Exception as e:
-        logger.error(f"Error in heartbeat task for user {user_id}: {e}")
