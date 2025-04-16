@@ -1,5 +1,7 @@
+import asyncio
 import json
 import logging
+import time
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from prisma.models import User
@@ -105,6 +107,7 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
     user = None
     connection_accepted = False
     in_queue = False
+    heartbeat_task = None
 
     try:
         # Authenticate user first
@@ -114,6 +117,9 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
         await websocket.accept()
         connection_accepted = True
         logger.info(f"Matchmaking WebSocket connection established for user {user_id}")
+
+        # Create heartbeat task
+        heartbeat_task = asyncio.create_task(send_heartbeats(websocket, user_id))
 
         try:
             # Update user status to indicate they're online
@@ -147,8 +153,8 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
             # While the player is in the queue, process messages
             while connection_accepted and in_queue:
                 try:
-                    # Wait for messages from the client
-                    message = await websocket.receive_json()
+                    # Set a timeout for receiving messages
+                    message = await asyncio.wait_for(websocket.receive_json(), timeout=30.0)
 
                     if not isinstance(message, dict):
                         logger.warning(f"Invalid message format from user {user_id}")
@@ -182,6 +188,22 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
                         await websocket.send_json(
                             {"type": "pong", "timestamp": message.get("timestamp")}
                         )
+
+                    elif action == "reconnect":
+                        # Handle reconnection - update the connection
+                        logger.info(f"Player {user_id} reconnected to matchmaking")
+                        # Just update the connection in the matchmaking queue
+                        await matchmaking_queue.add_player(user_id, websocket)
+
+                except TimeoutError:
+                    # No message received in timeout period, check if still connected
+                    try:
+                        # Send a ping to check connection
+                        await websocket.send_json({"type": "ping", "timestamp": time.time()})
+                    except Exception:
+                        logger.info(f"Connection lost for user {user_id}")
+                        connection_accepted = False
+                        break
 
                 except json.JSONDecodeError:
                     logger.warning(f"Invalid JSON from user {user_id}")
@@ -225,6 +247,14 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
                 pass
 
     finally:
+        # Cancel heartbeat task if it exists
+        if heartbeat_task:
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
+
         # Ensure the player is removed from the queue if the connection is closed
         if user and in_queue:
             await matchmaking_queue.remove_player(user.id)
@@ -235,3 +265,20 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
                 await User.prisma().update(where={"id": user.id}, data={"status": "ONLINE"})
             except Exception as status_err:
                 logger.error(f"Error updating user status: {status_err}")
+
+
+async def send_heartbeats(websocket: WebSocket, user_id: str) -> None:
+    """Send periodic heartbeats to keep the connection alive"""
+    try:
+        while True:
+            await asyncio.sleep(15.0)  # Send heartbeat every 15 seconds
+            try:
+                await websocket.send_json({"type": "heartbeat", "timestamp": time.time()})
+            except Exception as e:
+                logger.warning(f"Failed to send heartbeat to user {user_id}: {e}")
+                break
+    except asyncio.CancelledError:
+        # Task was cancelled, exit gracefully
+        pass
+    except Exception as e:
+        logger.error(f"Error in heartbeat task for user {user_id}: {e}")
