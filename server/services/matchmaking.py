@@ -67,43 +67,67 @@ class MatchmakingQueue:
         self._initialized = True
         logger.info("Matchmaking queue initialized")
 
-    async def start(self) -> None:
-        """Inicia o processamento da fila."""
+    async def start(self) -> list[asyncio.Task]:
+        """Starts the queue processing and returns the created tasks for cleanup"""
         if self.running:
-            return
+            return []
 
         self.running = True
-        self.matchmaking_task = asyncio.create_task(self._process_queue_loop())
-        self.cleanup_task = asyncio.create_task(self._cleanup_loop())
-        self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-        logger.info("Matchmaking queue processing started")
+        tasks = []
 
-    async def stop(self) -> None:
-        """Para o processamento da fila."""
+        self.matchmaking_task = asyncio.create_task(self._process_queue_loop())
+        tasks.append(self.matchmaking_task)
+
+        self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+        tasks.append(self.cleanup_task)
+
+        self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+        tasks.append(self.heartbeat_task)
+
+        logger.info("Matchmaking queue processing started")
+        return tasks
+
+    async def stop(self, force: bool = False) -> None:
+        """Stops the queue processing.
+
+        Args:
+            force: If True, cancel tasks immediately without waiting
+        """
         if not self.running:
             return
 
         self.running = False
-
         tasks = []
+
         if self.matchmaking_task:
             self.matchmaking_task.cancel()
             tasks.append(self.matchmaking_task)
+            self.matchmaking_task = None
 
         if self.cleanup_task:
             self.cleanup_task.cancel()
             tasks.append(self.cleanup_task)
+            self.cleanup_task = None
 
         if self.heartbeat_task:
             self.heartbeat_task.cancel()
             tasks.append(self.heartbeat_task)
+            self.heartbeat_task = None
 
-        # Aguarda todas as tasks serem canceladas
-        if tasks:
+        # Only wait for tasks to complete if not forcing
+        if tasks and not force:
             try:
                 await asyncio.gather(*tasks, return_exceptions=True)
             except asyncio.CancelledError:
                 pass
+
+        # Clear internal state to avoid recurring cleanup attempts
+        if force:
+            self.queue.clear()
+            self.connections.clear()
+            self.matched_players.clear()
+            self.connection_status.clear()
+            self.failed_attempts.clear()
 
         logger.info("Matchmaking queue processing stopped")
 
@@ -191,25 +215,34 @@ class MatchmakingQueue:
         Returns:
             bool: True se o jogador foi removido, False caso contrário
         """
-        async with self.lock:
-            # Verifica se o jogador está na fila
-            if user_id not in self.queue:
-                logger.warning(f"Player {user_id} not in queue")
-                return False
+        try:
+            async with asyncio.timeout(2.0):
+                async with self.lock:
+                    if user_id not in self.queue:
+                        logger.warning(f"Player {user_id} not in queue")
+                        return False
 
-            # Remove o jogador da fila
-            self.queue.pop(user_id, None)
+                    # Remove o jogador da fila
+                    self.queue.pop(user_id, None)
 
-            # Remove a conexão WebSocket e o status
+                    # Remove a conexão WebSocket e o status
+                    self.connections.pop(user_id, None)
+                    self.connection_status.pop(user_id, None)
+                    self.failed_attempts.pop(user_id, None)
+
+                    # Remove da lista de matched se estiver lá
+                    self.matched_players.discard(user_id)
+
+                    logger.info(f"Player {user_id} removed from matchmaking queue")
+                    return True
+        except (TimeoutError, asyncio.CancelledError):
+            logger.warning(
+                f"Timeout or cancellation removing player {user_id} from matchmaking queue"
+            )
+            # Do minimal cleanup outside lock
             self.connections.pop(user_id, None)
             self.connection_status.pop(user_id, None)
-            self.failed_attempts.pop(user_id, None)
-
-            # Remove da lista de matched se estiver lá
-            self.matched_players.discard(user_id)
-
-            logger.info(f"Player {user_id} removed from matchmaking queue")
-            return True
+            return False
 
     async def _heartbeat_loop(self) -> None:
         """Envia heartbeats periódicos para manter as conexões vivas."""
@@ -338,33 +371,34 @@ class MatchmakingQueue:
                 )  # Continue esperando mesmo em caso de erro
 
     async def _process_queue(self) -> None:
-        """Processa a fila de matchmaking para encontrar partidas."""
+        """Processes the matchmaking queue to find matches."""
         async with self.lock:
-            # Limpe a lista de jogadores pareados no início do ciclo
+            # Clear the matched players set at the start of each cycle
             self.matched_players.clear()
 
-            # Se não houver jogadores suficientes, não faça nada
+            # If there aren't enough players in the queue, don't do anything
             if len(self.queue) < 2:
                 return
 
-            # Obtenha jogadores na fila, ordenados por tempo de espera
-            all_players = sorted(
-                self.queue.keys(), key=lambda user_id: self.queue[user_id].joined_at
-            )
+            # Get players in the queue, ordered by wait time
+            # IMPORTANT: Only process players that are still in QUEUED status
+            all_players = [
+                user_id
+                for user_id, player in self.queue.items()
+                if player.status == PlayerStatus.QUEUED
+            ]
+            all_players.sort(key=lambda user_id: self.queue[user_id].joined_at)
 
-            # Filtra jogadores que já foram pareados
-            players = [p for p in all_players if p not in self.matched_players]
+            # Log for debugging
+            logger.debug(f"Processing queue with {len(all_players)} active players")
 
-            # Log para depuração
-            logger.debug(f"Processing queue with {len(players)} players: {players}")
-
-            # Processa jogadores em pares
+            # Process players in pairs
             i = 0
-            while i < len(players) - 1:
-                player1 = players[i]
-                player2 = players[i + 1]
+            while i < len(all_players) - 1:
+                player1 = all_players[i]
+                player2 = all_players[i + 1]
 
-                # Se algum dos jogadores já foi pareado, pule
+                # Skip if either player has already been matched
                 if player1 in self.matched_players or player2 in self.matched_players:
                     i += 1
                     continue

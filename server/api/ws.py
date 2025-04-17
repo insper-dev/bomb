@@ -93,14 +93,30 @@ async def game_websocket(websocket: WebSocket, game_id: str) -> None:
     finally:
         # Limpeza
         if user:
-            # Atualiza o status do usuário de volta para ONLINE
+            # Cleanup
             try:
-                await User.prisma().update(where={"id": user.id}, data={"status": "ONLINE"})
+                # Set a timeout for database operations during cleanup
+                await asyncio.wait_for(
+                    User.prisma().update(where={"id": user.id}, data={"status": "ONLINE"}),
+                    timeout=1.0,
+                )
             except Exception as status_err:
-                logger.error(f"Erro ao atualizar status do usuário: {status_err}")
+                logger.error(f"Error updating user status: {status_err}")
 
-            # Remove do jogo
-            await game_service.remove_player_connection(user.id)
+            # For game connections
+            try:
+                # Direct cleanup without locks
+                if game_service.player_game_map.get(user.id):
+                    game_id = game_service.player_game_map[user.id]
+                    game = game_service.games.get(game_id)
+                    if game:
+                        # Direct connection cleanup
+                        if user.id in game.connections:
+                            game.connections.pop(user.id, None)
+                        # Update player game map
+                        game_service.player_game_map.pop(user.id, None)
+            except Exception as e:
+                logger.error(f"Error removing player from game: {e}")
 
 
 @router.websocket("/matchmaking")
@@ -285,13 +301,45 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
                 pass
 
     finally:
-        # Garante que o jogador seja removido da fila se a conexão for fechada
-        if user and in_queue:
-            await matchmaking_queue.remove_player(user.id)
-
-        # Atualiza o status do usuário de volta para ONLINE se tivermos um usuário
         if user:
             try:
-                await User.prisma().update(where={"id": user.id}, data={"status": "ONLINE"})
-            except Exception as status_err:
-                logger.error(f"Error updating user status: {status_err}")
+                async with asyncio.timeout(2.0):
+                    # Set a timeout for database operations during cleanup
+                    try:
+                        await asyncio.wait_for(
+                            User.prisma().update(where={"id": user.id}, data={"status": "ONLINE"}),
+                            timeout=1.0,
+                        )
+                    except Exception as status_err:
+                        logger.error(f"Error updating user status: {status_err}")
+
+                    # For matchmaking connections
+                    try:
+                        if user.id in matchmaking_queue.connections:
+                            # Direct cleanup without locks
+                            for collection in [
+                                matchmaking_queue.connections,
+                                matchmaking_queue.queue,
+                                matchmaking_queue.connection_status,
+                            ]:
+                                collection.pop(user.id, None)
+                            matchmaking_queue.matched_players.discard(user.id)
+
+                            # Force close the connection if still open
+                            try:
+                                await websocket.close(code=WebSocketCloseCode.ERROR)
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        logger.error(f"Error removing player from matchmaking: {e}")
+
+            except (TimeoutError, asyncio.CancelledError):
+                logger.warning(f"Timeout during matchmaking cleanup for user {user.id}")
+                # Force cleanup even during timeout
+                for collection in [
+                    matchmaking_queue.connections,
+                    matchmaking_queue.queue,
+                    matchmaking_queue.connection_status,
+                ]:
+                    collection.pop(user.id, None)
+                matchmaking_queue.matched_players.discard(user.id)

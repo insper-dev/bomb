@@ -157,18 +157,29 @@ class Game:
         Returns:
             True if the player was added, False otherwise
         """
-        async with self.lock:
-            if player_id not in self.players:
-                logger.warning(f"Player {player_id} is not part of game {self.id}")
-                return False
+        try:
+            async with asyncio.timeout(2.0):
+                async with self.lock:
+                    if player_id not in self.players:
+                        logger.warning(f"Player {player_id} is not part of game {self.id}")
+                        return False
 
-            self.connections[player_id] = websocket
+                    self.connections[player_id] = websocket
 
-            # If all players are connected, start the game
-            if len(self.connections) == len(self.players) and not self.started:
-                await self.start_game()
+                    # If all players are connected, start the game
+                    if len(self.connections) == len(self.players) and not self.started:
+                        try:
+                            await self.start_game()
+                        except asyncio.CancelledError:
+                            logger.warning(f"Game {self.id} start cancelled during shutdown")
+                            return False
 
-            return True
+                    return True
+        except (TimeoutError, asyncio.CancelledError):
+            logger.warning(f"Timeout or cancellation adding player {player_id} to game {self.id}")
+            if player_id in self.connections:
+                self.connections.pop(player_id, None)
+            return False
 
     async def remove_player_connection(self, player_id: str) -> None:
         """Remove a player connection from the game.
@@ -176,35 +187,58 @@ class Game:
         Args:
             player_id: ID of the player
         """
-        async with self.lock:
+        try:
+            # Use a timeout to avoid hanging
+            async with asyncio.timeout(2.0):
+                async with self.lock:
+                    if player_id in self.connections:
+                        self.connections.pop(player_id)
+
+                    # If there are no more players, end the game
+                    if len(self.connections) == 0:
+                        await self.end_game("All players disconnected")
+        except (TimeoutError, asyncio.CancelledError):
+            logger.warning(
+                f"Timeout or cancellation removing player {player_id} from game {self.id}"
+            )
             if player_id in self.connections:
                 self.connections.pop(player_id)
 
-            # If there are no more players, end the game
-            if len(self.connections) == 0:
-                await self.end_game("All players disconnected")
-
     async def start_game(self) -> None:
         """Start the game."""
-        async with self.lock:
-            if self.started:
-                return
+        try:
+            async with asyncio.timeout(2.0):
+                async with self.lock:
+                    if self.started or self.ended:
+                        return
 
-            self.state.status = GameStatus.RUNNING
-            self.started = True
-            self.state.start_time = time.time()
+                    self.state.status = GameStatus.RUNNING
+                    self.started = True
+                    self.state.start_time = time.time()
 
-            # Notify all players that the game has started
-            await self.broadcast_event(
-                GameEvent(
-                    event_type="game_start", data=self._get_init_state_dict(), timestamp=time.time()
-                )
-            )
+                    # Notify all players that the game has started
+                    try:
+                        await self.broadcast_event(
+                            GameEvent(
+                                event_type="game_start",
+                                data=self._get_init_state_dict(),
+                                timestamp=time.time(),
+                            )
+                        )
+                    except Exception as e:
+                        logger.error(f"Error broadcasting game start: {e}")
+                        self.started = False
+                        return
 
-            # Start the game loop
-            self.game_loop_task = asyncio.create_task(self.game_loop())
+                    # Start the game loop
+                    self.game_loop_task = asyncio.create_task(self.game_loop())
 
-            logger.info(f"Game {self.id} started with players: {self.players}")
+                    logger.info(f"Game {self.id} started with players: {self.players}")
+        except (TimeoutError, asyncio.CancelledError):
+            logger.warning(f"Timeout or cancellation starting game {self.id}")
+            self.started = False
+            if self.game_loop_task:
+                self.game_loop_task.cancel()
 
     async def end_game(self, reason: str) -> None:
         """End the game.
@@ -212,28 +246,44 @@ class Game:
         Args:
             reason: Reason for ending the game
         """
-        async with self.lock:
-            if self.ended:
-                return
+        try:
+            async with asyncio.timeout(2.0):
+                async with self.lock:
+                    if self.ended:
+                        return
 
-            self.state.status = GameStatus.ENDED
-            self.ended = True
+                    self.state.status = GameStatus.ENDED
+                    self.ended = True
 
-            # Stop the game loop
+                    # Stop the game loop
+                    if self.game_loop_task and not self.game_loop_task.done():
+                        self.game_loop_task.cancel()
+                        try:
+                            await asyncio.wait_for(self.game_loop_task, timeout=1.0)
+                        except (TimeoutError, asyncio.CancelledError):
+                            pass
+
+                    # Clear connections immediately
+                    self.connections.clear()
+
+                    # Determine the winner
+                    winner_id = self._determine_winner()
+
+                    # Notify all players that the game has ended
+                    try:
+                        await self.broadcast_event(
+                            GameEvent.create_game_end_event(reason, winner_id)
+                        )
+                    except Exception as e:
+                        logger.error(f"Error broadcasting game end: {e}")
+
+                    logger.info(f"Game {self.id} ended: {reason}")
+        except (TimeoutError, asyncio.CancelledError):
+            logger.warning(f"Timeout or cancellation ending game {self.id}")
+            # Force cleanup
+            self.connections.clear()
             if self.game_loop_task:
                 self.game_loop_task.cancel()
-                try:
-                    await self.game_loop_task
-                except asyncio.CancelledError:
-                    pass
-
-            # Determine the winner
-            winner_id = self._determine_winner()
-
-            # Notify all players that the game has ended
-            await self.broadcast_event(GameEvent.create_game_end_event(reason, winner_id))
-
-            logger.info(f"Game {self.id} ended: {reason}")
 
     def _determine_winner(self) -> str | None:
         """Determine the winner of the game.
@@ -740,9 +790,45 @@ class GameService:
         self.player_game_map: dict[str, str] = {}
         # Lock for thread-safe access
         self.lock = asyncio.Lock()
+        # Active cleanup tasks
+        self.cleanup_tasks: list[asyncio.Task] = []
 
         self._initialized = True
         logger.info("Game service initialized")
+
+    async def force_cleanup(self) -> None:
+        """Force cleanup of all games and connections during shutdown."""
+        try:
+            async with asyncio.timeout(2.0):
+                async with self.lock:
+                    # Cancel all cleanup tasks
+                    for task in self.cleanup_tasks:
+                        if not task.done():
+                            task.cancel()
+
+                    # Force end all games
+                    for game in list(self.games.values()):
+                        if not game.ended:
+                            try:
+                                await game.end_game("Server shutdown")
+                            except Exception as e:
+                                logger.error(f"Error ending game {game.id}: {e}")
+                                # Force cleanup if ending fails
+                                game.connections.clear()
+                                if game.game_loop_task:
+                                    game.game_loop_task.cancel()
+
+                    # Clear all games and mappings
+                    self.games.clear()
+                    self.player_game_map.clear()
+                    self.cleanup_tasks.clear()
+
+        except (TimeoutError, asyncio.CancelledError):
+            logger.warning("Timeout or cancellation during game service cleanup")
+            # Force cleanup in case of timeout
+            self.games.clear()
+            self.player_game_map.clear()
+            self.cleanup_tasks.clear()
 
     async def create_game(self, player_ids: list[str]) -> str:
         """Create a new game instance for the specified players.
@@ -843,14 +929,36 @@ class GameService:
         Args:
             game_id: ID of the game
         """
-        async with self.lock:
-            game = self.games.pop(game_id, None)
-            if game:
-                # Remove player to game mappings
+        cleanup_task = asyncio.create_task(self._do_cleanup_game(game_id))
+        self.cleanup_tasks.append(cleanup_task)
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            logger.warning(f"Game cleanup cancelled for game {game_id}")
+
+    async def _do_cleanup_game(self, game_id: str) -> None:
+        """Internal method to clean up a game with timeout.
+
+        Args:
+            game_id: ID of the game
+        """
+        try:
+            async with asyncio.timeout(2.0):
+                async with self.lock:
+                    game = self.games.pop(game_id, None)
+                    if game:
+                        # Remove player to game mappings
+                        for player_id in game.players:
+                            self.player_game_map.pop(player_id, None)
+
+                        logger.info(f"Game {game_id} cleaned up")
+        except (TimeoutError, asyncio.CancelledError):
+            logger.warning(f"Timeout or cancellation during game cleanup for game {game_id}")
+            # Force cleanup even if timeout
+            if game_id in self.games:
+                game = self.games.pop(game_id)
                 for player_id in game.players:
                     self.player_game_map.pop(player_id, None)
-
-                logger.info(f"Game {game_id} cleaned up")
 
 
 # Initialize singleton instance
