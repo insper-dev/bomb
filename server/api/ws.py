@@ -7,7 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from prisma.models import User
 
 from core.models.matchmaking import QueuedPlayer
-from core.models.ws import WebSocketCloseCode
+from core.models.ws import WebSocketCloseCode, WSMessage
 from server.api.dependencies import auth_service
 from server.services.game import game_service
 from server.services.matchmaking import matchmaking_queue
@@ -17,106 +17,48 @@ router = APIRouter(tags=["Game WebSockets"])
 
 
 @router.websocket("/game/{game_id}")
-async def game_websocket(websocket: WebSocket, game_id: str) -> None:
-    user = None
-    connection_accepted = False
+async def game_ws(
+    websocket: WebSocket,
+    game_id: str,
+) -> None:
+    """WebSocket endpoint para o jogo"""
+    # autentica usuário
+    user = await auth_service.get_current_user_ws(websocket)
+
+    # aceita conexão
+    await websocket.accept()
+    if not user:
+        await websocket.close(code=1008)
+        return
+    player_id = user.id
+
+    # busca jogo
+    try:
+        game = game_service.get_game(game_id)
+    except KeyError:
+        await websocket.close(code=1003)
+        return
+
+    # adiciona conexão
+    game_service.add_connection(game_id, websocket)
 
     try:
-        # Autentica o usuário primeiro
-        user = await auth_service.get_current_user_ws(websocket)
-        user_id = user.id
+        # envia estado inicial para o novo jogador
+        await websocket.send_json(game.model_dump())
 
-        game = game_service.get_game(game_id)
-
-        if not game:
-            logger.warning(f"Jogo {game_id} não encontrado")
-            await websocket.close(code=WebSocketCloseCode.ERROR)
-            return
-
-        # Verifica se o usuário faz parte do jogo
-        if user_id not in game.players:
-            logger.warning(f"Usuário {user_id} não faz parte do jogo {game_id}")
-            await websocket.close(code=WebSocketCloseCode.ERROR)
-            return
-
-        # Aceita a conexão e adiciona ao jogo
-        await websocket.accept()
-        connection_accepted = True
-
-        success = await game_service.add_player_connection(user_id, game_id, websocket)
-        if not success:
-            await websocket.close(code=WebSocketCloseCode.ERROR)
-            return
-
-        # Atualiza o status do usuário para indicar que está em um jogo
-        await User.prisma().update(where={"id": user_id}, data={"status": "IN_GAME"})
-
-        # Processa mensagens enquanto a conexão estiver ativa
-        while connection_accepted:
-            try:
-                message = await websocket.receive_json()
-
-                # Processa ação do jogador
-                await game_service.handle_player_action(user_id, message)
-
-            except json.JSONDecodeError:
-                logger.warning(f"JSON inválido do usuário {user_id}")
-                continue
-            except WebSocketDisconnect:
-                logger.info(f"WebSocket desconectado para o usuário {user_id}")
-                connection_accepted = False
-                break
-            except Exception as e:
-                logger.error(f"Erro no websocket do jogo: {e}")
-                if connection_accepted:
-                    try:
-                        await websocket.send_json(
-                            {"type": "error", "message": "Erro ao processar mensagem"}
-                        )
-                    except Exception:
-                        connection_accepted = False
-                        break
-
+        while True:
+            raw = await websocket.receive_json()
+            msg = WSMessage(**raw)
+            # tradução de direção em (dx, dy)
+            deltas = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
+            dx, dy = deltas[msg.direction]
+            game.move_player(player_id, dx, dy)
+            # propaga estado atualizado para todos os jogadores
+            await game_service.broadcast_state(game_id)
     except WebSocketDisconnect:
-        logger.info(
-            f"WebSocket desconectado durante setup para o usuário "
-            f"{getattr(user, 'username', 'DESCONHECIDO')} no jogo {game_id}"
-        )
-    except Exception as e:
-        logger.error(f"Erro inesperado no websocket do jogo: {e}")
-        if connection_accepted:
-            try:
-                await websocket.close(code=WebSocketCloseCode.ERROR)
-            except Exception:
-                pass
-
-    finally:
-        # Limpeza
-        if user:
-            # Cleanup
-            try:
-                # Set a timeout for database operations during cleanup
-                await asyncio.wait_for(
-                    User.prisma().update(where={"id": user.id}, data={"status": "ONLINE"}),
-                    timeout=1.0,
-                )
-            except Exception as status_err:
-                logger.error(f"Error updating user status: {status_err}")
-
-            # For game connections
-            try:
-                # Direct cleanup without locks
-                if game_service.player_game_map.get(user.id):
-                    game_id = game_service.player_game_map[user.id]
-                    game = game_service.games.get(game_id)
-                    if game:
-                        # Direct connection cleanup
-                        if user.id in game.connections:
-                            game.connections.pop(user.id, None)
-                        # Update player game map
-                        game_service.player_game_map.pop(user.id, None)
-            except Exception as e:
-                logger.error(f"Error removing player from game: {e}")
+        # remove conexão quando jogador desconecta
+        game_service.remove_connection(game_id, websocket)
+        return
 
 
 @router.websocket("/matchmaking")

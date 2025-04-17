@@ -1,4 +1,3 @@
-# client/scenes/login.py
 import pygame
 import pygame.font
 

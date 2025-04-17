@@ -9,7 +9,6 @@ from prisma import Prisma
 
 from core.abstract import App
 from core.config import Settings
-from server.services.game import game_service
 from server.services.matchmaking import matchmaking_queue
 
 logger = logging.getLogger(__name__)
@@ -42,7 +41,7 @@ async def lifespan(app: FastAPI):  # noqa: ANN201
                             pass
 
                 # Force cleanup games first (they might hold locks)
-                await game_service.force_cleanup()
+                # await game_service.force_cleanup()
 
                 # Then force-stop the matchmaking queue
                 await matchmaking_queue.stop(force=True)
@@ -58,8 +57,8 @@ async def lifespan(app: FastAPI):  # noqa: ANN201
         except (TimeoutError, asyncio.CancelledError):
             logger.warning("Timeout during shutdown, forcing cleanup")
             # Force cleanup everything
-            game_service.games.clear()
-            game_service.player_game_map.clear()
+            # game_service.games.clear()
+            # game_service.player_game_map.clear()
             matchmaking_queue.queue.clear()
             matchmaking_queue.connections.clear()
             matchmaking_queue.matched_players.clear()
