@@ -40,7 +40,7 @@ async def login(credentials: Annotated[OAuth2PasswordRequestForm, Depends()]):  
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

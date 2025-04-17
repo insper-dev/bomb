@@ -174,7 +174,10 @@ class AuthService(ServiceBase):
 
         self.errors["signup"] = None
         self.signup_request_id = self.app.api_client.request(
-            "/auth/signup", "POST", {"username": username, "password": password}
+            "/auth/signup",
+            "POST",
+            json={"username": username, "password": password},
+            headers={"Content-Type": "application/json"},
         )
         return self.signup_request_id
 

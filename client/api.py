@@ -44,7 +44,13 @@ class APIClient:
         self.auth_token = token
 
     def _make_request(
-        self, request_id: str, method: str, endpoint: str, data: dict | None, headers: dict | None
+        self,
+        request_id: str,
+        method: str,
+        endpoint: str,
+        data: dict | None,
+        json: dict | None,
+        headers: dict | None,
     ) -> None:
         """
         Do a request to the server on a separate thread
@@ -66,9 +72,9 @@ class APIClient:
             if method == "GET":
                 response = self.client.get(endpoint, headers=headers)
             elif method == "POST":
-                response = self.client.post(endpoint, data=data, headers=headers)
+                response = self.client.post(endpoint, data=data, json=json, headers=headers)
             elif method == "PUT":
-                response = self.client.put(endpoint, data=data, headers=headers)
+                response = self.client.put(endpoint, data=data, json=json, headers=headers)
             elif method == "DELETE":
                 response = self.client.delete(endpoint, headers=headers)
             else:
@@ -101,6 +107,7 @@ class APIClient:
         endpoint: str,
         method: Literal["GET", "POST", "PUT", "DELETE"],
         data: dict | None = None,
+        json: dict | None = None,
         headers: dict | None = None,
     ) -> str:
         request_id = str(uuid.uuid4())
@@ -108,7 +115,7 @@ class APIClient:
         # Inicia thread para requisição
         thread = threading.Thread(
             target=self._make_request,
-            args=(request_id, method, endpoint, data, headers),
+            args=(request_id, method, endpoint, data, json, headers),
         )
         thread.daemon = True
         thread.start()
