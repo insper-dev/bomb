@@ -1,6 +1,10 @@
+import asyncio
 import logging
+from datetime import datetime
 
 from fastapi import WebSocket
+from prisma.models import Match, MatchPlayer
+from prisma.types import MatchUpdateInput
 
 from core.models.game import GameState
 
@@ -13,15 +17,81 @@ class GameService:
     def __init__(self) -> None:
         self._games: dict[str, GameState] = {}
         self._connections: dict[str, list[WebSocket]] = {}
+        self._timers: dict[str, asyncio.Task] = {}
 
     async def create_game(self, player_ids: list[str]) -> str:
-        """Cria um novo jogo e retorna seu ID"""
-        game = GameState()
+        """
+        Cria um novo jogo no banco de dados e em memória.
+
+        Args:
+            player_ids: Lista de IDs dos jogadores
+
+        Returns:
+            ID do jogo criado
+        """
+        db_match = await Match.prisma().create(
+            data={"players": {"create": [{"userId": player_id} for player_id in player_ids]}}
+        )
+
+        game_id = db_match.id
+
+        game = GameState(game_id=game_id)
         game.add_players(player_ids)
-        game_id = game.game_id
+
         self._games[game_id] = game
         self._connections[game_id] = []
+
+        self._timers[game_id] = asyncio.create_task(self._end_game_after_timeout(game_id, 60))
+
+        logger.info(f"Game created with ID: {game_id}")
         return game_id
+
+    async def _end_game_after_timeout(self, game_id: str, seconds: int) -> None:
+        """
+        Encerra o jogo após o timeout especificado.
+
+        Args:
+            game_id: ID do jogo
+            seconds: Tempo em segundos para encerrar o jogo
+        """
+        try:
+            await asyncio.sleep(seconds)
+            if game_id in self._games:
+                logger.info(f"Game {game_id} timeout reached ({seconds}s). Ending as draw.")
+                # Atualiza o objeto de jogo para indicar fim de jogo (empate)
+                self._games[game_id].end_game(winner_id=None)
+                # Finaliza o jogo no banco de dados
+                await self._finalize_match(game_id, winner_id=None)
+                # Notifica todos os clientes
+                await self.broadcast_state(game_id)
+                # Não remove o jogo para permitir que clientes vejam o estado final
+        except asyncio.CancelledError:
+            logger.info(f"Timer for game {game_id} was cancelled")
+        except Exception as e:
+            logger.error(f"Error in game timeout handler: {e}")
+
+    async def _finalize_match(self, game_id: str, winner_id: str | None = None) -> None:
+        """
+        Finaliza o jogo no banco de dados.
+
+        Args:
+            game_id: ID do jogo (que é o mesmo do Match no banco)
+            winner_id: ID do jogador vencedor, ou None se empate
+        """
+        # Atualiza o match no banco de dados (o game_id já é o ID do Match)
+        update_data: MatchUpdateInput = {
+            "endedAt": datetime.now(),
+        }
+
+        if winner_id:
+            update_data["winnerUserId"] = winner_id
+            await MatchPlayer.prisma().update_many(
+                where={"matchId": game_id, "userId": winner_id}, data={"isWinner": True}
+            )
+
+        await Match.prisma().update(where={"id": game_id}, data=update_data)
+
+        logger.info(f"Match {game_id} finalized. Winner: {winner_id or 'Draw'}")
 
     def get_game(self, game_id: str) -> GameState:
         """Retorna o GameState existente ou levanta KeyError"""
