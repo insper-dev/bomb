@@ -4,6 +4,7 @@ import pygame
 
 from client.scenes.base import BaseScene, Scenes
 from client.services.game import GameService
+from core.models.game import GameStatus
 
 
 class GameScene(BaseScene):
@@ -16,44 +17,69 @@ class GameScene(BaseScene):
         self.margin: int = 20
         self.game_service.start(self.game_id)
 
+        # Register callback for game end
+        self.game_service.register_game_ended_callback(self._on_game_ended)
+
+        # UI elements
+        self.font_large = pygame.font.SysFont(None, 48)
+        self.font_medium = pygame.font.SysFont(None, 36)
+        self.font_small = pygame.font.SysFont(None, 24)
+
+        # Auto-return to menu timer
+        self.return_to_menu_timer = None
+        self.return_countdown = 5  # seconds
+
+    def _on_game_ended(self, status: GameStatus, winner_id: str | None) -> None:
+        """Called when the game ends"""
+        self.return_to_menu_timer = pygame.time.get_ticks() + (self.return_countdown * 1000)
+
     def handle_event(self, event) -> None:
         if event.type == pygame.QUIT:
             self.app.running = False
         elif event.type == pygame.KEYDOWN:
             # Movement keys
-            key_map: dict[int, Literal["up", "down", "left", "right"]] = {
-                pygame.K_UP: "up",
-                pygame.K_DOWN: "down",
-                pygame.K_LEFT: "left",
-                pygame.K_RIGHT: "right",
-            }
-            if event.key in key_map:
-                self.game_service.send_move(key_map[event.key])
+            if not self.game_service.is_game_ended:
+                key_map: dict[int, Literal["up", "down", "left", "right"]] = {
+                    pygame.K_UP: "up",
+                    pygame.K_DOWN: "down",
+                    pygame.K_LEFT: "left",
+                    pygame.K_RIGHT: "right",
+                }
+                if event.key in key_map:
+                    self.game_service.send_move(key_map[event.key])
             # Exit to menu
-            elif event.key == pygame.K_ESCAPE:
+            elif event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE:
                 self.game_service.stop()
                 self.app.current_scene = Scenes.START
+
+    def update(self) -> None:
+        # Check if it's time to return to menu
+        if self.return_to_menu_timer and pygame.time.get_ticks() >= self.return_to_menu_timer:
+            self.game_service.stop()
+            self.app.current_scene = Scenes.START
+            return
+
+        super().update()
 
     def render(self) -> None:
         screen = self.app.screen
         screen.fill((0, 0, 0))
 
-        if not self.game_service.game_state:
+        if not self.game_service.state:
             # Waiting message
-            font = pygame.font.SysFont(None, 48)
-            text = font.render("Waiting for game state...", True, (200, 200, 200))
+            text = self.font_large.render("Waiting for game state...", True, (200, 200, 200))
             rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
             screen.blit(text, rect)
             return
 
-        rows = len(self.game_service.game_state.map)
-        cols = len(self.game_service.game_state.map[0]) if rows > 0 else 0
+        rows = len(self.game_service.state.map)
+        cols = len(self.game_service.state.map[0]) if rows > 0 else 0
         if cols == 0:
             return
 
         # Compute cell size
         avail_w = screen.get_width() - 2 * self.margin
-        avail_h = screen.get_height() - 2 * self.margin
+        avail_h = screen.get_height() - 2 * self.margin - 100
         cell_w = avail_w / cols
         cell_h = avail_h / rows
         size = int(min(cell_w, cell_h))
@@ -71,14 +97,43 @@ class GameScene(BaseScene):
 
         # Draw players
         colors = [(0, 120, 200), (200, 50, 50), (50, 200, 50), (200, 200, 50)]
-        for idx, (_, pstate) in enumerate(self.game_service.game_state.players.items()):
-            color = colors[idx % len(colors)]
+        for idx, (player_id, pstate) in enumerate(self.game_service.state.players.items()):
+            if (
+                self.game_service.is_game_ended
+                and self.game_service.state.status == GameStatus.WINNER
+                and self.game_service.state.winner_id == player_id
+            ):
+                color = (255, 215, 0)
+            else:
+                color = colors[idx % len(colors)]
+
             cx = self.margin + pstate.x * size + size / 2
             cy = self.margin + pstate.y * size + size / 2
             radius = size * 0.4
             pygame.draw.circle(screen, color, (int(cx), int(cy)), int(radius))
 
-        # Instruction to exit
-        font_small = pygame.font.SysFont(None, 24)
-        instr = font_small.render("Press ESC to return to menu", True, (180, 180, 180))
-        screen.blit(instr, (self.margin, screen.get_height() - self.margin - 20))
+        if self.game_service.is_game_ended:
+            result_text = self.game_service.game_result
+            text = self.font_large.render(result_text, True, (255, 255, 255))
+            rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() - 80))
+            screen.blit(text, rect)
+
+            if self.return_to_menu_timer:
+                remaining = max(0, (self.return_to_menu_timer - pygame.time.get_ticks()) // 1000)
+                countdown = self.font_medium.render(
+                    f"Returning to menu in {remaining} seconds...", True, (200, 200, 200)
+                )
+                screen.blit(
+                    countdown,
+                    (
+                        screen.get_width() // 2 - countdown.get_width() // 2,
+                        screen.get_height() - 40,
+                    ),
+                )
+        else:
+            # Regular game instructions
+            instr = self.font_small.render("Use arrow keys to move", True, (180, 180, 180))
+            screen.blit(instr, (self.margin, screen.get_height() - 80))
+
+            instr2 = self.font_small.render("Press ESC to return to menu", True, (180, 180, 180))
+            screen.blit(instr2, (self.margin, screen.get_height() - 50))

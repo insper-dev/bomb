@@ -6,7 +6,7 @@ from typing import Literal
 from websockets import ClientConnection, ConnectionClosed, connect
 
 from client.services.base import ServiceBase
-from core.models.game import GameState
+from core.models.game import GameState, GameStatus
 from core.models.ws import MovimentEvent
 
 
@@ -19,11 +19,16 @@ class GameService(ServiceBase):
     def __init__(self, app) -> None:
         super().__init__(app)
         self.websocket: ClientConnection | None = None
-        self.game_state: GameState | None = None
+        self.state: GameState | None = None
         self.running: bool = False
         self.match_id: str | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
+        self._game_ended_callbacks = []
+
+    def register_game_ended_callback(self, callback) -> None:
+        """Register a callback for when the game ends"""
+        self._game_ended_callbacks.append(callback)
 
     def start(self, match_id: str | None = None) -> None:
         """Start WebSocket connection to game server."""
@@ -53,11 +58,40 @@ class GameService(ServiceBase):
         """Send a move command: 'up', 'down', 'left' or 'right'."""
         if not self.running or not self.websocket or not self._loop:
             return
+
+        # Don't send moves if the game has ended
+        if self.state and self.state.status != GameStatus.PLAYING:
+            return
+
         try:
             payload = MovimentEvent(direction=direction).model_dump()
             asyncio.run_coroutine_threadsafe(self.websocket.send(json.dumps(payload)), self._loop)
         except Exception:
             pass
+
+    @property
+    def is_game_ended(self) -> bool:
+        """Check if the game has ended"""
+        if not self.state:
+            return False
+        return self.state.status != GameStatus.PLAYING
+
+    @property
+    def game_result(self) -> str:
+        """Get the game result text"""
+        if not self.state or self.state.status == GameStatus.PLAYING:
+            return "Game in progress"
+
+        if self.state.status == GameStatus.DRAW:
+            return "Game ended in a draw"
+
+        if self.state.winner_id:
+            user = self.app.auth_service.current_user
+            if user and user.id == self.state.winner_id:
+                return "You won!"
+            return "You lost!"
+
+        return "Game ended"
 
     def _run_loop(self, game_id: str, token: str) -> None:
         asyncio.set_event_loop(self._loop)
@@ -71,19 +105,31 @@ class GameService(ServiceBase):
         try:
             async with connect(uri) as ws:
                 self.websocket = ws
-                # Initial empty state
-                self.game_state = GameState()
+                previous_status = None
+
                 while self.running:
                     try:
                         raw = await ws.recv()
                         data = json.loads(raw)
-                        # Parse into GameState
-                        state = GameState.model_validate(data)
-                        self.game_state = state
+                        self.state = GameState.model_validate(data)
+
+                        # Check for game end
+                        if (
+                            previous_status == GameStatus.PLAYING
+                            and self.state.status != GameStatus.PLAYING
+                        ):
+                            # Game just ended, trigger callbacks
+                            for callback in self._game_ended_callbacks:
+                                try:
+                                    callback(self.state.status, self.state.winner_id)
+                                except Exception as e:
+                                    print(f"Error in game end callback: {e}")
+
+                        previous_status = self.state.status
                     except ConnectionClosed:
                         break
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Error in game connection: {e}")
         finally:
             self.running = False
             self.websocket = None
