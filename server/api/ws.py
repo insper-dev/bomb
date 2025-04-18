@@ -4,8 +4,9 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from prisma.partials import Opponent
 
-from core.models.ws import GameEvent
+from core.models.ws import GameEvent, MatchMakingEvent
 from server.api.dependencies import auth_service
 from server.services.game import game_service
 
@@ -25,18 +26,16 @@ async def matchmaking_loop() -> None:
 
                 ws1 = waiting_players[player_id1]
                 ws2 = waiting_players[player_id2]
-
-                payload = {
-                    "type": "match_found",
-                    "match_id": match_id,
-                    "opponent_id": player_id2,
-                }
+                opponent1 = await Opponent.prisma().find_unique(where={"id": player_id1})
+                opponent2 = await Opponent.prisma().find_unique(where={"id": player_id2})
 
                 try:
-                    await ws1.send_json(payload)
-
-                    payload["opponent_id"] = player_id1
-                    await ws2.send_json(payload)
+                    await ws1.send_json(
+                        MatchMakingEvent(match_id=match_id, opponent=opponent2).model_dump()
+                    )
+                    await ws2.send_json(
+                        MatchMakingEvent(match_id=match_id, opponent=opponent1).model_dump()
+                    )
 
                     del waiting_players[player_id1]
                     del waiting_players[player_id2]

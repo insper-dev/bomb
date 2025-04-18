@@ -1,6 +1,7 @@
 from enum import IntEnum
 from typing import Annotated, Literal
 
+from prisma.partials import Opponent
 from pydantic import BaseModel, Field, TypeAdapter
 
 
@@ -25,3 +26,9 @@ class BombEvent(BaseModel):
 
 GameEventType = Annotated[MovimentEvent | BombEvent, Field(discriminator="event")]
 GameEvent: TypeAdapter[GameEventType] = TypeAdapter(GameEventType)
+
+
+class MatchMakingEvent(BaseModel):
+    event: Literal["match_found", "error"] = "match_found"
+    match_id: str | None = None
+    opponent: Opponent | None = None
