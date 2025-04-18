@@ -1,13 +1,13 @@
 import asyncio
-import json
 import logging
 import threading
-from collections.abc import Callable
 
 import websockets
+from prisma.partials import Opponent
 from websockets import ClientConnection, connect
 
 from client.services.base import ServiceBase
+from core.models.ws import MatchMakingEvent
 
 
 class MatchmakingService(ServiceBase):
@@ -15,17 +15,15 @@ class MatchmakingService(ServiceBase):
     Connect to server, wait for a single 'match_found' message, then notify listeners.
     """
 
+    oponent: Opponent
+    match_id: str
+
     def __init__(self, app) -> None:
         super().__init__(app)
         self.websocket: ClientConnection | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
-        self.on_match_found_callbacks: list[Callable[[str, str], None]] = []
         self.running: bool = False
-
-    def add_match_found_listener(self, callback: Callable[[str, str], None]) -> None:
-        """Register a listener for match_found(match_id, opponent_id)"""
-        self.on_match_found_callbacks.append(callback)
 
     def start(self) -> None:
         """Begin matchmaking: opens a WebSocket, blocks until match found."""
@@ -65,31 +63,15 @@ class MatchmakingService(ServiceBase):
                 async with connect(uri) as ws:
                     self.websocket = ws
                     while self.running:
-                        try:
-                            raw = await ws.recv()
-                            data = json.loads(raw)
-                            if data.get("type") == "match_found":
-                                match_id = data.get("match_id")
-                                opponent = data.get("opponent_id")
-                                if not match_id or not opponent:
-                                    logging.error("Invalid match data received")
-                                    continue
+                        raw = await ws.recv()
+                        data = MatchMakingEvent.model_validate_json(raw)
+                        match data.event:
+                            case "match_found":
+                                self.opponent = data.opponent  # type: ignore [fé]
+                                self.match_id = data.match_id  # type: ignore [fé]
 
-                                self.match_id = match_id
-
-                                for cb in self.on_match_found_callbacks:
-                                    try:
-                                        cb(match_id, opponent)
-                                    except Exception as e:
-                                        logging.error(f"Error in match callback: {e!s}")
-
-                                # Success - exit both loops
                                 self.running = False
                                 break
-
-                        except json.JSONDecodeError as e:
-                            logging.error(f"Invalid message format: {e!s}")
-                            continue
 
             except (
                 websockets.exceptions.ConnectionClosed,

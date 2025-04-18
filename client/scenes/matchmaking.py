@@ -1,4 +1,5 @@
 import pygame
+from prisma.partials import Opponent
 
 from client.scenes.base import BaseScene, Scenes
 from client.services.matchmaking import MatchmakingService
@@ -10,20 +11,9 @@ class MatchmakingScene(BaseScene):
     def __init__(self, app) -> None:
         super().__init__(app)
         self.matchmaking: MatchmakingService = app.matchmaking_service
-        self.match_id: str | None = None
-        self.opponent_id: str | None = None
-
-        # Font for messages
-        self.font = pygame.font.SysFont(None, 48)
-
-        # Register callback and start matchmaking
-        self.matchmaking.add_match_found_listener(self._on_match_found)
         self.matchmaking.start()
 
-    def _on_match_found(self, match_id: str, opponent_id: str) -> None:
-        """Called when the server pairs us with an opponent."""
-        self.match_id = match_id
-        self.opponent_id = opponent_id
+        self.font = pygame.font.SysFont(None, 48)
 
     def handle_event(self, event) -> None:
         if event.type == pygame.QUIT:
@@ -36,8 +26,15 @@ class MatchmakingScene(BaseScene):
                 self.matchmaking.stop()
                 self.app.current_scene = Scenes.START
 
+    @property
+    def match_id(self) -> str | None:
+        return getattr(self.matchmaking, "match_id", None)
+
+    @property
+    def oponent(self) -> Opponent | None:
+        return getattr(self.matchmaking, "opponent", None)
+
     def update(self) -> None:
-        # On match, transition immediately to game scene
         if self.match_id:
             self.matchmaking.stop()
             self.app.game_service.start(self.match_id)
