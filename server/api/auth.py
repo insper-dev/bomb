@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -44,9 +43,7 @@ async def login(credentials: Annotated[OAuth2PasswordRequestForm, Depends()]):  
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    await User.prisma().update(
-        where={"id": user.id}, data={"lastLoginAt": datetime.now(UTC), "status": "ONLINE"}
-    )
+    await User.prisma().update(where={"id": user.id}, data={"status": "ONLINE"})
 
     access_token = auth_service.create_access_token({"sub": user.username})
 
@@ -61,4 +58,5 @@ async def logout(user: CurrentUserDep) -> dict:
 
 @router.get("/me", response_model=CurrentUser)
 async def me(user: CurrentUserDep) -> User:
+    await User.prisma().update(where={"id": user.id}, data={"status": "ONLINE"})
     return user

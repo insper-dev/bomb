@@ -9,109 +9,33 @@ datasource db {
   url      = "file:server.db"
 }
 
-// Usuários do jogo
+// User accounts
 model User {
-  id          String    @id @default(uuid())
-  username    String    @unique
-  password    String // HASH
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  lastLoginAt DateTime?
-  status      String    @default("OFFLINE") // ONLINE, OFFLINE, IN_GAME: ter cuidado com isso.
-
-  // Relações
-  userSkins    UserSkin[]
-  matchPlayers MatchPlayer[]
-  stats        UserStats?
-
-  // Preferência de skin atual
-  currentSkinId String?
-  currentSkin   Skin?   @relation("CurrentSkin", fields: [currentSkinId], references: [id])
+  id        String        @id @default(uuid())
+  username  String        @unique
+  password  String // Hashed password
+  createdAt DateTime      @default(now())
+  status    String        @default("OFFLINE") // ONLINE, OFFLINE, IN_GAME
+  matches   MatchPlayer[]
 }
 
-// Skins disponíveis no jogo
-model Skin {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  imageUrl    String?
-  isDefault   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-
-  // Relações
-  userSkins     UserSkin[]
-  usersWithSkin User[]     @relation("CurrentSkin")
+model Match {
+  id           String        @id @default(uuid())
+  startedAt    DateTime      @default(now())
+  endedAt      DateTime?
+  winnerUserId String?
+  players      MatchPlayer[]
 }
 
-// Relação entre usuários e skins (quais skins cada usuário possui)
-model UserSkin {
-  id         String   @id @default(uuid())
-  userId     String
-  skinId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  skin       Skin     @relation(fields: [skinId], references: [id], onDelete: Cascade)
-  obtainedAt DateTime @default(now())
-
-  @@unique([userId, skinId])
-}
-
-// Estatísticas do jogador
-model UserStats {
-  id     String @id @default(uuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Estatísticas gerais
-  matchesPlayed Int @default(0)
-  matchesWon    Int @default(0)
-  matchesLost   Int @default(0)
-
-  // Estatísticas específicas do Bomberman
-  bombsPlaced       Int @default(0)
-  wallsDestroyed    Int @default(0)
-  powerupsCollected Int @default(0)
-  playersKilled     Int @default(0)
-
-  // Ranking básico
-  rankPoints       Int @default(0)
-  highestWinStreak Int @default(0)
-
-  updatedAt DateTime @updatedAt
-}
-
-// Histórico de partidas
-model MatchHistory {
-  id           String   @id @default(uuid())
-  startedAt    DateTime
-  endedAt      DateTime
-  duration     Int // Em segundos
-  mapName      String?
-  gameMode     String   @default("CLASSIC") // só CLASSIC, por enquanto, ter cuidado com pseudo-enum.
-  winnerUserId String? // ID do jogador vencedor, nulo se não houver
-
-  // Relações
-  players MatchPlayer[]
-
-  createdAt DateTime @default(now())
-}
-
-// Jogadores que participaram de uma partida
 model MatchPlayer {
-  id      String @id @default(uuid())
-  matchId String
-  userId  String
-
-  match MatchHistory @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Informações básicas do jogador na partida
-  isWinner          Boolean @default(false)
-  bombsPlaced       Int     @default(0)
-  wallsDestroyed    Int     @default(0)
-  powerupsCollected Int     @default(0)
-  playersKilled     Int     @default(0)
-  survived          Boolean @default(false)
-  skinUsed          String? // ID da skin utilizada
+  id            String  @id @default(uuid())
+  matchId       String
+  userId        String
+  match         Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isWinner      Boolean @default(false)
+  bombsPlaced   Int     @default(0)
+  playersKilled Int     @default(0) // pra um futuro com mais players.
 
   @@unique([matchId, userId])
 }
