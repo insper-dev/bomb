@@ -7,7 +7,7 @@ from websockets import ClientConnection, ConnectionClosed, connect
 
 from client.services.base import ServiceBase
 from core.models.game import GameState
-from core.models.ws import WSMessage
+from core.models.ws import MovimentEvent
 
 
 class GameService(ServiceBase):
@@ -54,7 +54,7 @@ class GameService(ServiceBase):
         if not self.running or not self.websocket or not self._loop:
             return
         try:
-            payload = WSMessage(action="move", direction=direction).model_dump()
+            payload = MovimentEvent(direction=direction).model_dump()
             asyncio.run_coroutine_threadsafe(self.websocket.send(json.dumps(payload)), self._loop)
         except Exception:
             pass

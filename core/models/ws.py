@@ -1,7 +1,7 @@
 from enum import IntEnum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, TypeAdapter
 
 
 class WebSocketCloseCode(IntEnum):
@@ -14,6 +14,14 @@ class WebSocketCloseCode(IntEnum):
     UNAUTHORIZED = 4003
 
 
-class WSMessage(BaseModel):
-    action: Literal["move"]
+class MovimentEvent(BaseModel):
+    event: Literal["move"] = "move"
     direction: Literal["up", "down", "left", "right"]
+
+
+class BombEvent(BaseModel):
+    event: Literal["bomb"] = "bomb"
+
+
+GameEventType = Annotated[MovimentEvent | BombEvent, Field(discriminator="event")]
+GameEvent: TypeAdapter[GameEventType] = TypeAdapter(GameEventType)
