@@ -21,10 +21,10 @@ jobs:
       - name: Instalar dependências
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install pyinstaller -r requirements.txt
 
       - name: Gerar Prisma client
-        run: prisma generate
+        run: python -m prisma generate
 
       - name: Compilar com PyInstaller
         run: pyinstaller --noconfirm --clean --onefile --windowed --name lara-bomb main.py
@@ -52,10 +52,10 @@ jobs:
       - name: Instalar dependências
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install pyinstaller -r requirements.txt
 
       - name: Gerar Prisma client
-        run: npx prisma generate || prisma generate
+        run: python -m prisma generate
 
       - name: Compilar com PyInstaller
         run: pyinstaller --noconfirm --clean --onefile --name lara-bomb-linux main.py
@@ -80,10 +80,10 @@ jobs:
       - name: Instalar dependências
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install pyinstaller -r requirements.txt
 
       - name: Gerar Prisma client
-        run: prisma generate
+        run: python -m prisma generate
 
       - name: Compilar com PyInstaller
         run: pyinstaller --noconfirm --clean --onefile --name lara-bomb-macos main.py
