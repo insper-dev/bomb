@@ -1,9 +1,11 @@
 import asyncio
 import logging
+from collections import Counter
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from prisma.models import Match, User
 from prisma.partials import Opponent
 
 from core.models.ws import GameEvent, MatchMakingEvent
@@ -133,3 +135,40 @@ async def game_ws(websocket: WebSocket, game_id: str) -> None:
     except WebSocketDisconnect:
         game_service.remove_connection(game_id, websocket)
         return
+
+
+@router.websocket("/leaderboard")
+async def leaderboard_ws(websocket: WebSocket) -> None:
+    """
+    WebSocket público que envia a cada 5s um JSON:
+      { "leaderboard": [ {user_id, username, wins}, … ] }
+    """
+    await websocket.accept()
+    try:
+        while True:
+            matches = await Match.prisma().find_many(where={"NOT": [{"winnerUserId": None}]})
+            counts: Counter[str] = Counter()
+            for m in matches:
+                uid = m.winnerUserId
+                if uid:
+                    counts[uid] += 1
+
+            # top10
+            top10 = counts.most_common(10)
+            board: list[dict] = []
+            for user_id, wins in top10:
+                u = await User.prisma().find_unique(where={"id": user_id})
+                board.append(
+                    {
+                        "user_id": user_id,
+                        "username": u.username if u else user_id,
+                        "wins": wins,
+                    }
+                )
+
+            await websocket.send_json({"leaderboard": board})
+            await asyncio.sleep(5)
+    except WebSocketDisconnect:
+        logger.info("Leaderboard client disconnected")
+    except Exception as e:
+        logger.error(f"Erro no leaderboard_ws: {e!s}")
