@@ -1,0 +1,126 @@
+# Créditos: gerado pelo gpt-o4-mini-high
+name: Build & Release lara-bomb
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    name: Build para Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Gerar Prisma client
+        run: prisma generate
+
+      - name: Compilar com PyInstaller
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name lara-bomb main.py
+
+      - name: Publicar artefato Windows
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows
+          path: dist/lara-bomb.exe
+
+  build-linux:
+    name: Build para Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Dependências de sistema
+        run: sudo apt-get update && sudo apt-get install -y binutils
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Gerar Prisma client
+        run: npx prisma generate || prisma generate
+
+      - name: Compilar com PyInstaller
+        run: pyinstaller --noconfirm --clean --onefile --name lara-bomb-linux main.py
+
+      - name: Publicar artefato Linux
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux
+          path: dist/lara-bomb-linux
+
+  # build-macos:
+  #   name: Build para macOS
+  #   runs-on: macos-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: '3.13'
+
+  #     - name: Instalar dependências
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install -r requirements.txt
+
+  #     - name: Gerar Prisma client
+  #       run: prisma generate
+
+  #     - name: Compilar com PyInstaller
+  #       run: pyinstaller --noconfirm --clean --onefile --name lara-bomb-macos main.py
+
+  #     - name: Publicar artefato macOS
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: macos
+  #         path: dist/lara-bomb-macos
+
+  release:
+    name: Criar Release no GitHub
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-linux, build-macos]
+    steps:
+      - name: Baixar artefato Windows
+        uses: actions/download-artifact@v3
+        with:
+          name: windows
+          path: dist
+
+      - name: Baixar artefato Linux
+        uses: actions/download-artifact@v3
+        with:
+          name: linux
+          path: dist
+
+      # - name: Baixar artefato macOS
+      #   uses: actions/download-artifact@v3
+      #   with:
+      #     name: macos
+      #     path: dist
+
+      - name: Publicar GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist/lara-bomb.exe
+            dist/lara-bomb-linux
