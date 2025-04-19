@@ -29,7 +29,7 @@ class ServerApp(App):
         self.app = FastAPI(
             title="Lara Bomb Online Server",
             description="Server for Lara Bomb Online",
-            version="0.0.5",
+            version="0.1.0",
             docs_url="/docs" if settings.server_debug else None,
             redoc_url="/redoc" if settings.server_debug else None,
             lifespan=lifespan,

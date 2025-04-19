@@ -66,33 +66,33 @@ jobs:
           name: linux
           path: dist/lara-bomb-linux
 
-  # build-macos:
-  #   name: Build para macOS
-  #   runs-on: macos-latest
-  #   steps:
-  #     - uses: actions/checkout@v3
+  build-macos:
+    name: Build para macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
 
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v4
-  #       with:
-  #         python-version: '3.13'
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
 
-  #     - name: Instalar dependências
-  #       run: |
-  #         python -m pip install --upgrade pip
-  #         pip install -r requirements.txt
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-  #     - name: Gerar Prisma client
-  #       run: prisma generate
+      - name: Gerar Prisma client
+        run: prisma generate
 
-  #     - name: Compilar com PyInstaller
-  #       run: pyinstaller --noconfirm --clean --onefile --name lara-bomb-macos main.py
+      - name: Compilar com PyInstaller
+        run: pyinstaller --noconfirm --clean --onefile --name lara-bomb-macos main.py
 
-  #     - name: Publicar artefato macOS
-  #       uses: actions/upload-artifact@v3
-  #       with:
-  #         name: macos
-  #         path: dist/lara-bomb-macos
+      - name: Publicar artefato macOS
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos
+          path: dist/lara-bomb-macos
 
   release:
     name: Criar Release no GitHub
@@ -111,11 +111,11 @@ jobs:
           name: linux
           path: dist
 
-      # - name: Baixar artefato macOS
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: macos
-      #     path: dist
+      - name: Baixar artefato macOS
+        uses: actions/download-artifact@v3
+        with:
+          name: macos
+          path: dist
 
       - name: Publicar GitHub Release
         uses: softprops/action-gh-release@v2
@@ -124,3 +124,4 @@ jobs:
           files: |
             dist/lara-bomb.exe
             dist/lara-bomb-linux
+            dist/lara-bomb-macos
