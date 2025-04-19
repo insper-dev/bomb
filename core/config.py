@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     server_access_token_expire_minutes: int = 60 * 24 * 7
     server_algorithm: str = "HS256"
 
-    server_endpoint: str = "lara-bomb.insper.dev"
-    server_endpoint_ssl: bool = False
+    server_endpoint: str = "lara-bomb-api.insper.dev"
+    server_endpoint_ssl: bool = True
 
     client_title: str = "Lara Bomb"
     client_width: int = 800
