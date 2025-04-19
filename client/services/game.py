@@ -50,13 +50,37 @@ class GameService(ServiceBase):
 
     def stop(self) -> None:
         """Stop WebSocket loop and close connection."""
+        if not self.running:
+            return
+
         self.running = False
+
+        # Verificar se estamos na mesma thread do loop - se sim, não podemos interrompê-lo aqui
+        current_thread = threading.current_thread()
+        if self._thread and current_thread == self._thread:
+            print("Warning: Trying to stop game service from its own thread!")
+            return
+
+        # Estamos em thread diferente, podemos fechar o websocket
         if self.websocket and self._loop:
-            asyncio.run_coroutine_threadsafe(self.websocket.close(), self._loop)
+            try:
+                asyncio.run_coroutine_threadsafe(self.websocket.close(), self._loop)
+            except Exception as e:
+                print(f"Error closing websocket: {e}")
+
+        # Paramos o loop
         if self._loop:
-            self._loop.call_soon_threadsafe(self._loop.stop)
+            try:
+                self._loop.call_soon_threadsafe(self._loop.stop)
+            except Exception as e:
+                print(f"Error stopping event loop: {e}")
+
+        # Esperamos que a thread termine (com timeout)
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=1)
+            try:
+                self._thread.join(timeout=1)
+            except Exception as e:
+                print(f"Error joining thread: {e}")
 
     def send_move(self, direction: Literal["up", "down", "left", "right"]) -> None:
         """Send a move command: 'up', 'down', 'left' or 'right'."""

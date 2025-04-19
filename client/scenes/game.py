@@ -31,7 +31,9 @@ class GameScene(BaseScene):
 
     def _on_game_ended(self, status: GameStatus, winner_id: str | None) -> None:
         """Called when the game ends"""
-        self.return_to_menu_timer = pygame.time.get_ticks() + (self.return_countdown * 1000)
+        # Não chame game_service.stop() aqui - isso tentará parar a thread de dentro dela mesma
+        # Apenas definimos uma flag para fazer a transição na thread principal
+        self.should_transition_to_game_over = True
 
     def handle_event(self, event) -> None:
         if event.type == pygame.QUIT:
@@ -55,12 +57,17 @@ class GameScene(BaseScene):
                 self.app.current_scene = Scenes.START
 
     def update(self) -> None:
-        # Check if it's time to return to menu
-        if self.return_to_menu_timer and pygame.time.get_ticks() >= self.return_to_menu_timer:
-            self.game_service.stop()
-            self.app.current_scene = Scenes.START
+        # Primeiro verificamos se o jogo sinalizou que acabou e devemos transitar para o game over
+        if hasattr(self, "should_transition_to_game_over") and self.should_transition_to_game_over:
+            # Primeiro paramos o game service (na thread principal)
+            if self.game_service.running:
+                print("Stopping game service from main thread")
+                self.game_service.stop()
+            # Então mudamos para a cena de game over
+            self.app.current_scene = Scenes.GAME_OVER
             return
 
+        # Processamento normal
         super().update()
 
     def render(self) -> None:

@@ -76,3 +76,4 @@ class Scenes(str, Enum):
     MATCHMAKING = "matchmaking"
     GAME = "game"
     LOGIN = "login"
+    GAME_OVER = "game_over"
