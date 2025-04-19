@@ -44,9 +44,11 @@ class ServerApp(App):
         )
 
         from .api.auth import router as auth_router
+        from .api.match import router as match_router
         from .api.ws import router as ws_router
 
         self.app.include_router(auth_router, prefix="/api/auth")
+        self.app.include_router(match_router, prefix="/api/match")
         self.app.include_router(ws_router, prefix="/ws")
 
     def run(self) -> None:

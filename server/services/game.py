@@ -164,9 +164,27 @@ class GameService:
             explosion_state = game.add_explosion(bomb_id, x, y, radius)
             await self.broadcast_state(game_id)
 
-            logger.info(f"Game {game_id}: bomb {bomb_id} exploded")
-
             await asyncio.sleep(explosion_state.duration)
+
+            # 1) Detecta quem foi atingido
+            hit = []
+            for pid, p in game.players.items():
+                if (p.x == x and abs(p.y - y) <= radius) or (p.y == y and abs(p.x - x) <= radius):
+                    hit.append(pid)
+
+            if hit:
+                # Para 2 players, o vencedor é o outro
+                winner = next(pid for pid in game.players if pid not in hit)
+                game.end_game(winner_id=winner)
+                # 2) Grava no DB
+                await MatchPlayer.prisma().update_many(
+                    where={"matchId": game_id, "userId": winner}, data={"isWinner": True}
+                )
+                await self._finalize_match(game_id, winner)
+                # 3) Notifica fim
+                await self.broadcast_state(game_id)
+                return
+
             game.clear_explosion(bomb_id)
             await self.broadcast_state(game_id)
 
