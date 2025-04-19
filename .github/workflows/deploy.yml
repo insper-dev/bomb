@@ -27,21 +27,12 @@ jobs:
 
       - name: Iniciar container com variáveis de ambiente
         env:
-          SERVER_BIND: ${{ secrets.SERVER_BIND }}
-          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          EXTERNAL_PORT: ${{ secrets.EXTERNAL_PORT }}
           SERVER_SECRET_KEY: ${{ secrets.SERVER_SECRET_KEY }}
-          SERVER_DEBUG: False
-          SERVER_ACCESS_TOKEN_EXPIRE_MINUTES: 10080
-          SERVER_ALGORITHM: ${{ secrets.SERVER_ALGORITHM }}
         run: |
           docker run -d \
             --name app \
             --restart always \
-            -p 8000:8000 \
-            -e SERVER_BIND \
-            -e SERVER_PORT \
+            -p ${EXTERNAL_PORT}:8000 \
             -e SERVER_SECRET_KEY \
-            -e SERVER_DEBUG \
-            -e SERVER_ACCESS_TOKEN_EXPIRE_MINUTES \
-            -e SERVER_ALGORITHM \
             felipeadeildo/app:latest
