@@ -2,9 +2,9 @@ import asyncio
 import logging
 import threading
 
-import websockets
 from prisma.partials import Opponent
-from websockets import ClientConnection, connect
+from websockets import ClientConnection, ConnectionClosed, connect
+from websockets.exceptions import InvalidHandshake
 
 from client.services.base import ServiceBase
 from core.models.ws import MatchMakingEvent
@@ -15,15 +15,14 @@ class MatchmakingService(ServiceBase):
     Connect to server, wait for a single 'match_found' message, then notify listeners.
     """
 
-    oponent: Opponent
-    match_id: str
-
     def __init__(self, app) -> None:
         super().__init__(app)
         self.websocket: ClientConnection | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self.running: bool = False
+        self.match_id: str | None = None
+        self.opponent: Opponent | None = None
 
     def start(self) -> None:
         """Begin matchmaking: opens a WebSocket, blocks until match found."""
@@ -32,6 +31,10 @@ class MatchmakingService(ServiceBase):
             raise RuntimeError("Not authenticated")
         if self.running:
             return
+
+        self.match_id = None
+        self.opponent = None
+
         self.running = True
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
@@ -39,19 +42,42 @@ class MatchmakingService(ServiceBase):
 
     def stop(self) -> None:
         """Stop the matchmaking loop and close connection."""
+        if not self.running:
+            return
         self.running = False
+
+        async def _close_and_stop() -> None:
+            if self.websocket and self._loop:
+                try:
+                    await self.websocket.close()
+                finally:
+                    self._loop.stop()
+
         if self.websocket and self._loop:
-            asyncio.run_coroutine_threadsafe(self.websocket.close(), self._loop)
-        if self._loop:
+            asyncio.run_coroutine_threadsafe(_close_and_stop(), self._loop)
+        elif self._loop:
             self._loop.call_soon_threadsafe(self._loop.stop)
+
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1)
 
     def _run_loop(self) -> None:
-        asyncio.set_event_loop(self._loop)
+        """Set up the event loop, dispare o handler e mantenha-o vivo."""
         if not self._loop:
             return
-        self._loop.run_until_complete(self._handler())
+
+        asyncio.set_event_loop(self._loop)
+        # registra o handler como tarefa
+        self._loop.create_task(self._handler())
+        # fica rodando até que alguém chame loop.stop()
+        self._loop.run_forever()
+
+        # cleanup: cancela tarefas pendentes e fecha o loop
+        pending = asyncio.all_tasks(self._loop)
+        for task in pending:
+            task.cancel()
+        self._loop.run_until_complete(self._loop.shutdown_asyncgens())
+        self._loop.close()
 
     async def _handler(self) -> None:
         """Connect, await match_found, then close."""
@@ -59,38 +85,37 @@ class MatchmakingService(ServiceBase):
         uri = f"{protocol}://{self.app.settings.server_endpoint}/ws/matchmaking?token={self.app.api_client.auth_token}"
 
         max_retries = 3
-        retry_count = 0
         retry_delay = 1  # seconds
 
-        while retry_count < max_retries and self.running:
+        for attempt in range(max_retries):
+            if not self.running:
+                break
+
             try:
                 async with connect(uri) as ws:
                     self.websocket = ws
+                    # aguarda evento match_found
                     while self.running:
-                        raw = await ws.recv()
-                        data = MatchMakingEvent.model_validate_json(raw)
-                        match data.event:
-                            case "match_found":
-                                self.opponent = data.opponent  # type: ignore [fé]
-                                self.match_id = data.match_id  # type: ignore [fé]
+                        msg = await ws.recv()
+                        data = MatchMakingEvent.model_validate_json(msg)
+                        if data.event == "match_found":
+                            self.opponent = data.opponent
+                            self.match_id = data.match_id
+                            self.running = False
+                            break
+                    return  # sai do handler ao reunir dois jogadores
 
-                                self.running = False
-                                break
-
-            except (
-                websockets.exceptions.ConnectionClosed,
-                websockets.exceptions.InvalidHandshake,
-            ) as e:
-                logging.error(f"WebSocket connection error: {e!s}")
-                if retry_count < max_retries - 1:
-                    retry_count += 1
+            except (ConnectionClosed, InvalidHandshake) as e:
+                logging.error(f"WS error (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay)
                     continue
-                raise  # Re-raise on max retries
+                else:
+                    raise
 
             except Exception as e:
-                logging.error(f"Unexpected error in matchmaking: {e!s}")
+                logging.error(f"Unexpected error in matchmaking: {e}")
                 raise
 
-        self.websocket = None
         self.running = False
+        self.websocket = None
