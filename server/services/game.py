@@ -146,6 +146,17 @@ class GameService:
         logger.info(f"Game {game_id}: bomb placed {bomb_id} at ({x},{y})")
         await self.broadcast_state(game_id)
 
+        # incrementa contador de bombas no DB
+        try:
+            await MatchPlayer.prisma().update_many(
+                where={"matchId": game_id, "userId": owner_id},
+                data={"bombsPlaced": {"increment": 1}},
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to update bombsPlaced for match {game_id}, user {owner_id}: {e!s}"
+            )
+
         # programa explosão após 3s
         async def _explode() -> None:
             await asyncio.sleep(3)
