@@ -6,7 +6,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: felipeadeildo
+    runs-on: self-hosted
 
     steps:
       - name: Checkout do código
