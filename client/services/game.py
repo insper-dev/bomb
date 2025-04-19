@@ -51,8 +51,12 @@ class GameService(ServiceBase):
     def stop(self) -> None:
         """Stop WebSocket loop and close connection."""
         self.running = False
+        if self.websocket and self._loop:
+            asyncio.run_coroutine_threadsafe(self.websocket.close(), self._loop)
         if self._loop:
             self._loop.call_soon_threadsafe(self._loop.stop)
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=1)
 
     def send_move(self, direction: Literal["up", "down", "left", "right"]) -> None:
         """Send a move command: 'up', 'down', 'left' or 'right'."""
@@ -124,6 +128,9 @@ class GameService(ServiceBase):
                                     callback(self.state.status, self.state.winner_id)
                                 except Exception as e:
                                     print(f"Error in game end callback: {e}")
+                            self.running = False
+                            await ws.close()
+                            break
 
                         previous_status = self.state.status
                     except ConnectionClosed:

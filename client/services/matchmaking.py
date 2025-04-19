@@ -38,10 +38,14 @@ class MatchmakingService(ServiceBase):
         self._thread.start()
 
     def stop(self) -> None:
-        """Stop the matchmaking loop (if needed)."""
+        """Stop the matchmaking loop and close connection."""
         self.running = False
+        if self.websocket and self._loop:
+            asyncio.run_coroutine_threadsafe(self.websocket.close(), self._loop)
         if self._loop:
             self._loop.call_soon_threadsafe(self._loop.stop)
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=1)
 
     def _run_loop(self) -> None:
         asyncio.set_event_loop(self._loop)
