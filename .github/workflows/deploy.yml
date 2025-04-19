@@ -1,0 +1,47 @@
+name: Deploy do Server
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: felipeadeildo
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+
+      - name: Build da imagem Docker
+        run: |
+          docker build \
+            --file Dockerfile \
+            --tag felipeadeildo/app:latest \
+            .
+
+      - name: Remover container antigo (se houver)
+        run: |
+          if docker ps -a --format '{{.Names}}' | grep -q '^app$'; then
+            docker rm -f app
+          fi
+
+      - name: Iniciar container com variáveis de ambiente
+        env:
+          SERVER_BIND: ${{ secrets.SERVER_BIND }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_SECRET_KEY: ${{ secrets.SERVER_SECRET_KEY }}
+          SERVER_DEBUG: False
+          SERVER_ACCESS_TOKEN_EXPIRE_MINUTES: 10080
+          SERVER_ALGORITHM: ${{ secrets.SERVER_ALGORITHM }}
+        run: |
+          docker run -d \
+            --name app \
+            --restart always \
+            -p 8000:8000 \
+            -e SERVER_BIND \
+            -e SERVER_PORT \
+            -e SERVER_SECRET_KEY \
+            -e SERVER_DEBUG \
+            -e SERVER_ACCESS_TOKEN_EXPIRE_MINUTES \
+            -e SERVER_ALGORITHM \
+            felipeadeildo/app:latest
