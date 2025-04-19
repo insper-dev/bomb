@@ -7,7 +7,7 @@ from websockets import ClientConnection, ConnectionClosed, connect
 
 from client.services.base import ServiceBase
 from core.models.game import GameState, GameStatus
-from core.models.ws import MovimentEvent
+from core.models.ws import MovimentEvent, PlaceBombEvent
 
 
 class GameService(ServiceBase):
@@ -73,6 +73,24 @@ class GameService(ServiceBase):
         except Exception:
             pass
 
+    def send_bomb(self) -> None:
+        if not self.running or not self.websocket or not self._loop or not self.state:
+            return
+
+        if not self.app.auth_service.current_user:
+            return
+
+        uid = self.app.auth_service.current_user.id
+        p = self.state.players.get(uid)
+        if not p:
+            return
+        try:
+            # TODO: esse radius deve ser definido pelo servidor com base nos power-ups ativos.
+            ev = PlaceBombEvent(x=p.x, y=p.y, radius=1)
+            asyncio.run_coroutine_threadsafe(self.websocket.send(ev.model_dump_json()), self._loop)
+        except Exception:
+            pass
+
     @property
     def is_game_ended(self) -> bool:
         """Check if the game has ended"""
@@ -122,7 +140,7 @@ class GameService(ServiceBase):
                             previous_status == GameStatus.PLAYING
                             and self.state.status != GameStatus.PLAYING
                         ):
-                            # Game just ended, trigger callbacks
+                            # trigger end callbacks
                             for callback in self._game_ended_callbacks:
                                 try:
                                     callback(self.state.status, self.state.winner_id)

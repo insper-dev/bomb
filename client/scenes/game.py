@@ -47,6 +47,8 @@ class GameScene(BaseScene):
                 }
                 if event.key in key_map:
                     self.game_service.send_move(key_map[event.key])
+            if event.key == pygame.K_SPACE and not self.game_service.is_game_ended:
+                self.game_service.send_bomb()
             # Exit to menu
             elif event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE:
                 self.game_service.stop()
@@ -64,16 +66,11 @@ class GameScene(BaseScene):
     def render(self) -> None:
         screen = self.app.screen
         screen.fill((0, 0, 0))
-
-        if not self.game_service.state:
-            # Waiting message
-            text = self.font_large.render("Waiting for game state...", True, (200, 200, 200))
-            rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
-            screen.blit(text, rect)
+        state = self.game_service.state
+        if not state:
             return
 
-        rows = len(self.game_service.state.map)
-        cols = len(self.game_service.state.map[0]) if rows > 0 else 0
+        rows, cols = len(state.map), len(state.map[0])
         if cols == 0:
             return
 
@@ -97,11 +94,11 @@ class GameScene(BaseScene):
 
         # Draw players
         colors = [(0, 120, 200), (200, 50, 50), (50, 200, 50), (200, 200, 50)]
-        for idx, (player_id, pstate) in enumerate(self.game_service.state.players.items()):
+        for idx, (player_id, pstate) in enumerate(state.players.items()):
             if (
                 self.game_service.is_game_ended
-                and self.game_service.state.status == GameStatus.WINNER
-                and self.game_service.state.winner_id == player_id
+                and state.status == GameStatus.WINNER
+                and state.winner_id == player_id
             ):
                 color = (255, 215, 0)
             else:
@@ -111,6 +108,28 @@ class GameScene(BaseScene):
             cy = self.margin + pstate.y * size + size / 2
             radius = size * 0.4
             pygame.draw.circle(screen, color, (int(cx), int(cy)), int(radius))
+
+        # Draw bombs
+        for bomb in state.bombs:
+            bx = self.margin + bomb.x * size + size / 2
+            by = self.margin + bomb.y * size + size / 2
+            pygame.draw.circle(screen, (200, 200, 200), (int(bx), int(by)), int(size * 0.3))
+
+        # Draw explosions as a "+" cross
+        for exp in state.explosions:
+            cx = self.margin + exp.x * size + size // 2
+            cy = self.margin + exp.y * size + size // 2
+            arm = exp.radius * size
+            color = (255, 100, 0)
+            # central square
+            center_rect = pygame.Rect(cx - size // 4, cy - size // 4, size // 2, size // 2)
+            pygame.draw.rect(screen, color, center_rect)
+            # horizontal arm
+            horiz_rect = pygame.Rect(cx - arm, cy - size // 8, arm * 2, size // 4)
+            pygame.draw.rect(screen, color, horiz_rect)
+            # vertical arm
+            vert_rect = pygame.Rect(cx - size // 8, cy - arm, size // 4, arm * 2)
+            pygame.draw.rect(screen, color, vert_rect)
 
         if self.game_service.is_game_ended:
             result_text = self.game_service.game_result

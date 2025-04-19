@@ -20,11 +20,14 @@ class MovimentEvent(BaseModel):
     direction: Literal["up", "down", "left", "right"]
 
 
-class BombEvent(BaseModel):
-    event: Literal["bomb"] = "bomb"
+class PlaceBombEvent(BaseModel):
+    event: Literal["place_bomb"] = "place_bomb"
+    x: int
+    y: int
+    radius: int = Field(default=1)
 
 
-GameEventType = Annotated[MovimentEvent | BombEvent, Field(discriminator="event")]
+GameEventType = Annotated[MovimentEvent | PlaceBombEvent, Field(discriminator="event")]
 GameEvent: TypeAdapter[GameEventType] = TypeAdapter(GameEventType)
 
 

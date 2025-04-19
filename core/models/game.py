@@ -4,8 +4,6 @@ from pydantic import BaseModel, Field
 
 
 class GameStatus(str, Enum):
-    """Status of a game"""
-
     PLAYING = "playing"
     DRAW = "draw"
     WINNER = "winner"
@@ -17,13 +15,30 @@ class PlayerState(BaseModel):
     y: int = 0
 
 
+class BombState(BaseModel):
+    bomb_id: str
+    x: int
+    y: int
+    owner_id: str
+    radius: int = 1
+
+
+class ExplosionState(BaseModel):
+    bomb_id: str
+    x: int
+    y: int
+    radius: int
+    duration: float = 0.5  # segundos de animação
+
+
 class GameState(BaseModel):
     game_id: str
     players: dict[str, PlayerState] = Field(default_factory=dict)
-    # Map 13x11: 0 = empty, future codes for bombs, walls, etc.
     map: list[list[int]] = Field(default_factory=lambda: [[0] * 11 for _ in range(13)])
     status: GameStatus = GameStatus.PLAYING
     winner_id: str | None = None
+    bombs: list[BombState] = Field(default_factory=list)
+    explosions: list[ExplosionState] = Field(default_factory=list)
 
     def add_players(self, player_ids: list[str]) -> None:
         """Add players to the game with initial positions"""
@@ -53,3 +68,17 @@ class GameState(BaseModel):
             self.winner_id = winner_id
         else:
             self.status = GameStatus.DRAW
+
+    def add_bomb(self, bomb: BombState) -> None:
+        self.bombs.append(bomb)
+
+    def explode_bomb(self, bomb_id: str) -> None:
+        self.bombs = [b for b in self.bombs if b.bomb_id != bomb_id]
+
+    def add_explosion(self, bomb_id: str, x: int, y: int, radius: int) -> ExplosionState:
+        explosion = ExplosionState(bomb_id=bomb_id, x=x, y=y, radius=radius)
+        self.explosions.append(explosion)
+        return explosion
+
+    def clear_explosion(self, bomb_id: str) -> None:
+        self.explosions = [e for e in self.explosions if e.bomb_id != bomb_id]

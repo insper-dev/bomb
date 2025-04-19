@@ -89,12 +89,8 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
 
 
 @router.websocket("/game/{game_id}")
-async def game_ws(
-    websocket: WebSocket,
-    game_id: str,
-) -> None:
-    """WebSocket endpoint para o jogo"""
-    # autentica usuário
+async def game_ws(websocket: WebSocket, game_id: str) -> None:
+    """WebSocket endpoint para o jogo."""
     user = await auth_service.get_current_user_ws(websocket)
 
     # aceita conexão
@@ -102,7 +98,6 @@ async def game_ws(
     if not user:
         await websocket.close(code=1008)
         return
-    player_id = user.id
 
     # busca jogo
     try:
@@ -120,13 +115,21 @@ async def game_ws(
 
         while True:
             raw = await websocket.receive_json()
-            msg = GameEvent.validate_python(raw)
-            if msg.event == "move":
-                deltas = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
-                dx, dy = deltas[msg.direction]
-                game.move_player(player_id, dx, dy)
-
-            await game_service.broadcast_state(game_id)
+            ev = GameEvent.validate_python(raw)
+            if ev.event == "move":
+                # move player
+                dx, dy = {
+                    "up": (0, -1),
+                    "down": (0, 1),
+                    "left": (-1, 0),
+                    "right": (1, 0),
+                }[ev.direction]
+                game = game_service.get_game(game_id)
+                game.move_player(user.id, dx, dy)
+                await game_service.broadcast_state(game_id)
+            elif ev.event == "place_bomb":
+                # coloca bomba e agenda explosão
+                await game_service.place_bomb(game_id, user.id, ev.x, ev.y, ev.radius)
     except WebSocketDisconnect:
         game_service.remove_connection(game_id, websocket)
         return
