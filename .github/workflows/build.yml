@@ -98,6 +98,8 @@ jobs:
     name: Criar Release no GitHub
     runs-on: ubuntu-latest
     needs: [build-windows, build-linux, build-macos]
+    permissions:
+      contents: write
     steps:
       - name: Baixar artefato Windows
         uses: actions/download-artifact@v4
