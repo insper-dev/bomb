@@ -18,6 +18,7 @@ class BaseScene(ABC):
         Args:
             app: Client App
         """
+
         self.app = app
         self.next_scene: BaseScene | None = None
         self.components = []
@@ -42,13 +43,41 @@ class BaseScene(ABC):
         """
         raise NotImplementedError
 
+    def _handle_event(self, event) -> None:
+        """
+        Handle events for the scene.
+        """
+        if event.type == pygame.QUIT:
+            self.app.running = False
+
+        self.handle_event(event)
+
+        for components in self.components:
+            components.handle_event(event)
+
+    def _render(self) -> None:
+        """
+        Render the scene.
+        """
+        # TODO: constante de cor. THIS IS A FUCKING BLACK!
+        self.app.screen.fill((0, 0, 0))
+
+        # Render the scene
+        self.render()
+
+        # Render components
+        for component in self.components:
+            component.render()
+
+        pygame.display.flip()
+
     def update(self) -> None:
         """Update the scene logic."""
 
         for event in pygame.event.get():
-            self.handle_event(event)
+            self._handle_event(event)
 
-        self.render()
+        self._render()
 
     # TODO: type these functions
     def add_component(self, component: ...) -> None:
@@ -70,10 +99,14 @@ class BaseScene(ABC):
         if component in self.components:
             self.components.remove(component)
 
+    def _next_scene(self, scene) -> None:
+        self.app.current_scene = scene
+
 
 class Scenes(str, Enum):
     START = "start"
     MATCHMAKING = "matchmaking"
     GAME = "game"
     LOGIN = "login"
-    GAME_OVER = "game_over"
+    MAIN_MENU = "main_menu"
+    INITIAL_SCENE = "initi_scene"
