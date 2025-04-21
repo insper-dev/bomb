@@ -1,5 +1,6 @@
 from client.scenes.base import BaseScene, Scenes
 from client.scenes.game import GameScene
+from client.scenes.game_over import GameOverScene
 from client.scenes.initial_scene import InitialScene
 from client.scenes.login import LoginScene
 from client.scenes.main_menu import MainMenuScene
@@ -13,6 +14,7 @@ SCENES_MAP: dict[Scenes, type[BaseScene]] = {
     Scenes.GAME: GameScene,
     Scenes.MAIN_MENU: MainMenuScene,
     Scenes.INITIAL_SCENE: InitialScene,
+    Scenes.GAME_OVER: GameOverScene,
 }
 """Mapping of scenes to their respective classes."""
 

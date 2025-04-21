@@ -181,3 +181,84 @@ FONT_SIZE_MAP: dict[
 # Game constants
 
 GAME_ALPHABET_KEYS = [pygame.key.key_code(key) for key in "abcdefghijklmnopqrstuvwxyz"]
+
+MODULE_SIZE = 64
+
+# Players
+
+CARLITOS: dict[Literal["up", "down", "left", "right", "stand_by"], list[pygame.Surface]] = {
+    "right": [
+        pygame.transform.scale(
+            pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_1.jpeg")),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_2.jpeg")),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_3.jpeg")),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+    "left": [
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_1.jpeg")),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_2.jpeg")),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_3.jpeg")),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+    ],
+    "down": [
+        pygame.transform.scale(
+            pygame.image.load(Path("client/assets/images/carlitos_player/front_1.jpeg")),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(Path("client/assets/images/carlitos_player/front_2.jpeg")),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(Path("client/assets/images/carlitos_player/front_3.jpeg")),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+    "up": [
+        pygame.transform.scale(
+            pygame.image.load(Path("client/assets/images/carlitos_player/back_1.jpeg")),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(Path("client/assets/images/carlitos_player/back_2.jpeg")),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(Path("client/assets/images/carlitos_player/back_3.jpeg")),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+    "stand_by": [
+        pygame.transform.scale(
+            pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_2.jpeg")),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+}

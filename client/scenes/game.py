@@ -2,9 +2,11 @@ from typing import Literal
 
 import pygame
 
+from client.game.players import Carlitos, Player
 from client.scenes.base import BaseScene, Scenes
 from client.services.game import GameService
-from core.models.game import GameStatus
+from core.constants import MODULE_SIZE
+from core.models.game import GameState, GameStatus
 
 
 class GameScene(BaseScene):
@@ -29,11 +31,25 @@ class GameScene(BaseScene):
         self.return_to_menu_timer = None
         self.return_countdown = 5  # seconds
 
+        # Initiate players objects
+        self.players_initialized = False
+
     def _on_game_ended(self, status: GameStatus, winner_id: str | None) -> None:
         """Called when the game ends"""
         # Não chame game_service.stop() aqui - isso tentará parar a thread de dentro dela mesma
         # Apenas definimos uma flag para fazer a transição na thread principal
         self.should_transition_to_game_over = True
+
+    def _create_playes_objects(self, state: GameState) -> None:
+        self.players: dict[str, Player] = {}
+        for player_id, pstate in state.players.items():
+            self.players[player_id] = Carlitos(
+                self.app.screen,
+                (
+                    pstate.x * MODULE_SIZE + self.margin,
+                    pstate.y * MODULE_SIZE + self.margin,
+                ),
+            )
 
     def handle_event(self, event) -> None:
         if event.type == pygame.QUIT:
@@ -55,6 +71,10 @@ class GameScene(BaseScene):
             elif event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE:
                 self.game_service.stop()
                 self.app.current_scene = Scenes.START
+        for pid, player in self.players.items():
+            user = self.app.auth_service.current_user
+            if user is not None and user.id == pid:
+                player.handle_events(event)
 
     def update(self) -> None:
         # Primeiro verificamos se o jogo sinalizou que acabou e devemos transitar para o game over
@@ -81,61 +101,56 @@ class GameScene(BaseScene):
         if cols == 0:
             return
 
-        # Compute cell size
-        avail_w = screen.get_width() - 2 * self.margin
-        avail_h = screen.get_height() - 2 * self.margin - 100
-        cell_w = avail_w / cols
-        cell_h = avail_h / rows
-        size = int(min(cell_w, cell_h))
-
         # Draw grid
         for y in range(rows):
             for x in range(cols):
                 rect = pygame.Rect(
-                    self.margin + x * size,
-                    self.margin + y * size,
-                    size,
-                    size,
+                    self.margin + x * MODULE_SIZE,
+                    self.margin + y * MODULE_SIZE,
+                    MODULE_SIZE,
+                    MODULE_SIZE,
                 )
                 pygame.draw.rect(screen, (50, 50, 50), rect, width=1)
 
         # Draw players
-        colors = [(0, 120, 200), (200, 50, 50), (50, 200, 50), (200, 200, 50)]
-        for idx, (player_id, pstate) in enumerate(state.players.items()):
-            if (
-                self.game_service.is_game_ended
-                and state.status == GameStatus.WINNER
-                and state.winner_id == player_id
-            ):
-                color = (255, 215, 0)
-            else:
-                color = colors[idx % len(colors)]
 
-            cx = self.margin + pstate.x * size + size / 2
-            cy = self.margin + pstate.y * size + size / 2
-            radius = size * 0.4
-            pygame.draw.circle(screen, color, (int(cx), int(cy)), int(radius))
+        if not self.players_initialized:
+            self._create_playes_objects(state)
+            self.players_initialized = True
+
+        for player_id, player_state in state.players.items():
+            for id, player in self.players.items():
+                if id == player_id:
+                    player.position = (
+                        player_state.x * MODULE_SIZE + self.margin,
+                        player_state.y * MODULE_SIZE + self.margin,
+                    )
+
+        for player in self.players.values():
+            player.render()
 
         # Draw bombs
         for bomb in state.bombs:
-            bx = self.margin + bomb.x * size + size / 2
-            by = self.margin + bomb.y * size + size / 2
-            pygame.draw.circle(screen, (200, 200, 200), (int(bx), int(by)), int(size * 0.3))
+            bx = self.margin + bomb.x * MODULE_SIZE + MODULE_SIZE / 2
+            by = self.margin + bomb.y * MODULE_SIZE + MODULE_SIZE / 2
+            pygame.draw.circle(screen, (200, 200, 200), (int(bx), int(by)), int(MODULE_SIZE * 0.3))
 
         # Draw explosions as a "+" cross
         for exp in state.explosions:
-            cx = self.margin + exp.x * size + size // 2
-            cy = self.margin + exp.y * size + size // 2
-            arm = exp.radius * size
+            cx = self.margin + exp.x * MODULE_SIZE + MODULE_SIZE // 2
+            cy = self.margin + exp.y * MODULE_SIZE + MODULE_SIZE // 2
+            arm = exp.radius * MODULE_SIZE
             color = (255, 100, 0)
             # central square
-            center_rect = pygame.Rect(cx - size // 4, cy - size // 4, size // 2, size // 2)
+            center_rect = pygame.Rect(
+                cx - MODULE_SIZE // 4, cy - MODULE_SIZE // 4, MODULE_SIZE // 2, MODULE_SIZE // 2
+            )
             pygame.draw.rect(screen, color, center_rect)
             # horizontal arm
-            horiz_rect = pygame.Rect(cx - arm, cy - size // 8, arm * 2, size // 4)
+            horiz_rect = pygame.Rect(cx - arm, cy - MODULE_SIZE // 8, arm * 2, MODULE_SIZE // 4)
             pygame.draw.rect(screen, color, horiz_rect)
             # vertical arm
-            vert_rect = pygame.Rect(cx - size // 8, cy - arm, size // 4, arm * 2)
+            vert_rect = pygame.Rect(cx - MODULE_SIZE // 8, cy - arm, MODULE_SIZE // 4, arm * 2)
             pygame.draw.rect(screen, color, vert_rect)
 
         if self.game_service.is_game_ended:

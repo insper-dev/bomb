@@ -224,6 +224,5 @@ class LoginScene(BaseScene):
 
     def authentication_change(self) -> None:
         self.is_signup_mode = not self.is_signup_mode
-        self.interative_components[4].label = self.non_interative[0].label = (
-            "Login" if self.is_signup_mode else "Sing-In"
-        )
+        self.interative_components[4].label = "Login" if self.is_signup_mode else "Sing-In"
+        self.non_interative[0].label = "Sing-In" if self.is_signup_mode else "Login"

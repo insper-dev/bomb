@@ -110,3 +110,4 @@ class Scenes(str, Enum):
     LOGIN = "login"
     MAIN_MENU = "main_menu"
     INITIAL_SCENE = "initi_scene"
+    GAME_OVER = "game_over_scene"

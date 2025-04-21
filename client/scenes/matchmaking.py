@@ -24,7 +24,7 @@ class MatchmakingScene(BaseScene):
             # Allow user to cancel matchmaking
             if event.key == pygame.K_ESCAPE:
                 self.matchmaking.stop()
-                self.app.current_scene = Scenes.START
+                self.app.current_scene = Scenes.MAIN_MENU
 
     @property
     def match_id(self) -> str | None:
