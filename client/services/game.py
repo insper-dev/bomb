@@ -97,7 +97,7 @@ class GameService(ServiceBase):
         except Exception:
             pass
 
-    def send_bomb(self) -> None:
+    def send_bomb(self, explosion_radius: int = 0, explosion_time: float = 3) -> None:
         if not self.running or not self.websocket or not self._loop or not self.state:
             return
 
@@ -110,7 +110,9 @@ class GameService(ServiceBase):
             return
         try:
             # TODO: esse radius deve ser definido pelo servidor com base nos power-ups ativos.
-            ev = PlaceBombEvent(x=p.x, y=p.y, radius=1)
+            ev = PlaceBombEvent(
+                x=p.x, y=p.y, radius=explosion_radius, explosion_time=explosion_time
+            )
             asyncio.run_coroutine_threadsafe(self.websocket.send(ev.model_dump_json()), self._loop)
         except Exception:
             pass

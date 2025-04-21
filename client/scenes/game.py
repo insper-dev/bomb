@@ -2,6 +2,8 @@ from typing import Literal
 
 import pygame
 
+from client.game.bomb import Bomb
+from client.game.particles import Particles
 from client.game.players import Carlitos, Player
 from client.scenes.base import BaseScene, Scenes
 from client.services.game import GameService
@@ -19,6 +21,12 @@ class GameScene(BaseScene):
         self.margin: int = 20
         self.game_service.start(self.game_id)
 
+        # Initiate Game Music
+        self.song = "client/assets/sounds/map1_song.mpeg"
+        pygame.mixer.music.load(self.song)
+        pygame.mixer.music.play(-1)
+        print(pygame.mixer.music.get_pos(), pygame.mixer.music.get_volume())
+
         # Register callback for game end
         self.game_service.register_game_ended_callback(self._on_game_ended)
 
@@ -32,7 +40,14 @@ class GameScene(BaseScene):
         self.return_countdown = 5  # seconds
 
         # Initiate players objects
+        self.players: dict[str, Player] = {}
         self.players_initialized = False
+
+        # Initiate bombs objects
+        self.bombs: dict[str, Bomb] = {}
+
+        # Initiate partivles objects
+        self.particles: dict[str, Particles] = {}
 
     def _on_game_ended(self, status: GameStatus, winner_id: str | None) -> None:
         """Called when the game ends"""
@@ -41,7 +56,6 @@ class GameScene(BaseScene):
         self.should_transition_to_game_over = True
 
     def _create_playes_objects(self, state: GameState) -> None:
-        self.players: dict[str, Player] = {}
         for player_id, pstate in state.players.items():
             self.players[player_id] = Carlitos(
                 self.app.screen,
@@ -65,16 +79,23 @@ class GameScene(BaseScene):
                 }
                 if event.key in key_map:
                     self.game_service.send_move(key_map[event.key])
-            if event.key == pygame.K_SPACE and not self.game_service.is_game_ended:
-                self.game_service.send_bomb()
             # Exit to menu
             elif event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE:
                 self.game_service.stop()
                 self.app.current_scene = Scenes.START
+
         for pid, player in self.players.items():
             user = self.app.auth_service.current_user
-            if user is not None and user.id == pid:
+            if user and user.id == pid:
                 player.handle_events(event)
+                if (
+                    event.type == pygame.KEYDOWN
+                    and event.key == pygame.K_SPACE
+                    and not self.game_service.is_game_ended
+                ):
+                    self.game_service.send_bomb(
+                        explosion_radius=player.status["power"], explosion_time=3.5
+                    )
 
     def update(self) -> None:
         # Primeiro verificamos se o jogo sinalizou que acabou e devemos transitar para o game over
@@ -130,28 +151,40 @@ class GameScene(BaseScene):
             player.render()
 
         # Draw bombs
+
         for bomb in state.bombs:
-            bx = self.margin + bomb.x * MODULE_SIZE + MODULE_SIZE / 2
-            by = self.margin + bomb.y * MODULE_SIZE + MODULE_SIZE / 2
-            pygame.draw.circle(screen, (200, 200, 200), (int(bx), int(by)), int(MODULE_SIZE * 0.3))
+            if bomb.bomb_id not in self.bombs:
+                x = self.margin + bomb.x * MODULE_SIZE
+                y = self.margin + bomb.y * MODULE_SIZE
+                self.bombs[bomb.bomb_id] = Bomb(self.app.screen, (x, y))
+
+        for bomb in self.bombs.values():
+            bomb.render()
 
         # Draw explosions as a "+" cross
         for exp in state.explosions:
-            cx = self.margin + exp.x * MODULE_SIZE + MODULE_SIZE // 2
-            cy = self.margin + exp.y * MODULE_SIZE + MODULE_SIZE // 2
-            arm = exp.radius * MODULE_SIZE
-            color = (255, 100, 0)
-            # central square
-            center_rect = pygame.Rect(
-                cx - MODULE_SIZE // 4, cy - MODULE_SIZE // 4, MODULE_SIZE // 2, MODULE_SIZE // 2
-            )
-            pygame.draw.rect(screen, color, center_rect)
-            # horizontal arm
-            horiz_rect = pygame.Rect(cx - arm, cy - MODULE_SIZE // 8, arm * 2, MODULE_SIZE // 4)
-            pygame.draw.rect(screen, color, horiz_rect)
-            # vertical arm
-            vert_rect = pygame.Rect(cx - MODULE_SIZE // 8, cy - arm, MODULE_SIZE // 4, arm * 2)
-            pygame.draw.rect(screen, color, vert_rect)
+            x = self.margin + exp.x * MODULE_SIZE
+            y = self.margin + exp.y * MODULE_SIZE
+            position = (x, y)
+            to_remove = []
+            for id in self.bombs:
+                if exp.bomb_id == id:
+                    to_remove.append(id)
+                    if id not in self.particles:
+                        self.particles[id] = Particles(
+                            self.app.screen, self.particles, position, exp.radius
+                        )
+            for item in to_remove:
+                del self.bombs[item]
+
+        to_remove = []
+        for particle in self.particles.values():
+            yup = particle.render()
+            if yup != "":
+                to_remove.append(yup)
+
+        for item in to_remove:
+            del self.particles[item]
 
         if self.game_service.is_game_ended:
             result_text = self.game_service.game_result

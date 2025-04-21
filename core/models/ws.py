@@ -25,6 +25,7 @@ class PlaceBombEvent(BaseModel):
     x: int
     y: int
     radius: int = Field(default=1)
+    explosion_time: float
 
 
 GameEventType = Annotated[MovimentEvent | PlaceBombEvent, Field(discriminator="event")]

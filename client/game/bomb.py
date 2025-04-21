@@ -1,25 +1,23 @@
 from typing import Literal
 
 import pygame
-import pygame.surface
+
+from core.constants import BOMB_COKING
 
 
 class Bomb:
     def __init__(
         self,
         screen: pygame.Surface,
-        images: list[pygame.Surface],
         position: tuple[int, int],
-        explosion_radius: int,
     ) -> None:
         self.screen = screen
-        self.sprites = images
+        self.sprites = BOMB_COKING
         self.position = position
         self.sprite_index = 0
-        self.explosion_radius = explosion_radius
         self.tick = 500  # mileconds
+        self.explosion_time = self.tick * len(self.sprites)
         self.explode = False
-        self.ready = False
         self._initialize_timer()
 
     def _initialize_timer(self) -> None:
@@ -29,9 +27,15 @@ class Bomb:
             "time_counter": 0,
         }
 
+    def _update_timer(self) -> None:
+        current_time = pygame.time.get_ticks()
+        self.time["time_elapsed"] = current_time - self.time["initial_time"]
+        self.time["initial_time"] = current_time
+        self.time["time_counter"] += self.time["time_elapsed"]
+
     def __draw(self) -> None:
         image = self.sprites[self.sprite_index]
-        rect = image.get_rect(top_left=self.position)
+        rect = image.get_rect(topleft=self.position)
         self.screen.blit(image, rect)
 
     def _coking(self) -> None:
@@ -41,6 +45,13 @@ class Bomb:
         self.__draw()
         if self.time["time_counter"] >= self.tick:
             self.sprite_index += 1
+            self.time["time_counter"] = 0
+
+    def _explode_check(self) -> None:
+        if not self.explode:
+            return
 
     def render(self) -> None:
+        self._update_timer()
         self._coking()
+        self._explode_check()

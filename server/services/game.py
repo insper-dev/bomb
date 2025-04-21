@@ -137,7 +137,9 @@ class GameService:
         for websocket in dead_connections:
             self.remove_connection(game_id, websocket)
 
-    async def place_bomb(self, game_id: str, owner_id: str, x: int, y: int, radius: int) -> None:
+    async def place_bomb(
+        self, game_id: str, owner_id: str, x: int, y: int, radius: int, time: float
+    ) -> None:
         game = self._games[game_id]
         bomb_id = str(uuid4())
         bomb = BombState(bomb_id=bomb_id, x=x, y=y, owner_id=owner_id, radius=radius)
@@ -159,7 +161,7 @@ class GameService:
 
         # programa explosão após 3s
         async def _explode() -> None:
-            await asyncio.sleep(3)
+            await asyncio.sleep(time)
             game.explode_bomb(bomb_id)
             explosion_state = game.add_explosion(bomb_id, x, y, radius)
             await self.broadcast_state(game_id)

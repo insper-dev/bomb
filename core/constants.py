@@ -184,6 +184,72 @@ GAME_ALPHABET_KEYS = [pygame.key.key_code(key) for key in "abcdefghijklmnopqrstu
 
 MODULE_SIZE = 64
 
+# Bomb
+
+BOMB_COKING: list[pygame.Surface] = [
+    pygame.transform.scale(
+        pygame.image.load(Path("client/assets/images/Bomb/bomb_state_1.png")),
+        (MODULE_SIZE, MODULE_SIZE),
+    ),
+    pygame.transform.scale(
+        pygame.image.load(Path("client/assets/images/Bomb/bomb_state_2.png")),
+        (MODULE_SIZE, MODULE_SIZE),
+    ),
+    pygame.transform.scale(
+        pygame.image.load(Path("client/assets/images/Bomb/bomb_state_3.png")),
+        (MODULE_SIZE, MODULE_SIZE),
+    ),
+    pygame.transform.scale(
+        pygame.image.load(Path("client/assets/images/Bomb/bomb_state_4.png")),
+        (MODULE_SIZE, MODULE_SIZE),
+    ),
+    pygame.transform.scale(
+        pygame.image.load(Path("client/assets/images/Bomb/bomb_state_5.png")),
+        (MODULE_SIZE, MODULE_SIZE),
+    ),
+]
+
+# Particles
+
+
+EXPLOSION_PARTICLES: dict[Literal["geo", "tip", "tail"], list[pygame.Surface]] = {
+    "geo": [
+        pygame.transform.rotate(
+            pygame.transform.scale(
+                pygame.image.load(Path("client/assets/images/particles/particles_geo.jpeg")),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            angle,
+        )
+        for angle in range(0, 271, 90)
+    ],
+    "tip": [
+        pygame.transform.rotate(
+            pygame.transform.scale(
+                pygame.image.load(Path("client/assets/images/particles/particles_tip.jpeg")),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            angle,
+        )
+        for angle in range(0, 271, 90)
+    ],
+    "tail": [
+        pygame.transform.rotate(
+            pygame.transform.scale(
+                pygame.image.load(Path("client/assets/images/particles/particles_tail.jpeg")),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            angle,
+        )
+        for angle in range(0, 271, 90)
+    ],
+}
+
+print(
+    EXPLOSION_PARTICLES,
+    pygame.image.load(Path("client/assets/images/particles/particles_tail.jpeg")),
+)
+
 # Players
 
 CARLITOS: dict[Literal["up", "down", "left", "right", "stand_by"], list[pygame.Surface]] = {

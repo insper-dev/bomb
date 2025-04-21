@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 import pygame
 
@@ -20,6 +20,11 @@ class Player:
         self.sprites_index: int = 0
         self.velocity: int = 1
         self.moviment_state: Literal["stand_by", "left", "right", "down", "up"] = "stand_by"
+        self.status: dict[Literal["vidas", "power", "active_power_up"], Any] = {
+            "vidas": 10,
+            "power": 1,
+            "active_power_up": None,
+        }
         self._initialize_timer()
 
     def render(self) -> None:
@@ -78,6 +83,7 @@ class Player:
 
     def __draw(self, image: pygame.Surface) -> None:
         rect = image.get_rect(topleft=self.position)
+        image.convert_alpha()
         self.screen.blit(image, rect)
 
 
