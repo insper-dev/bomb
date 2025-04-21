@@ -3,6 +3,7 @@ from typing import Literal
 import pygame
 
 from core.constants import EXPLOSION_PARTICLES, MODULE_SIZE
+from core.types import ParticleType
 
 
 class Particles:
@@ -11,7 +12,7 @@ class Particles:
     ) -> None:
         self.screen = screen
         self.paticles = partcles
-        self.images: dict[Literal["geo", "tail", "tip"], list[pygame.Surface]] = EXPLOSION_PARTICLES
+        self.images: dict[ParticleType, list[pygame.Surface]] = EXPLOSION_PARTICLES
         self.position = position
         self.radius = radius
         self._initialize_timer()
@@ -53,7 +54,6 @@ class Particles:
                 for image, position in zip(images, positions, strict=False):
                     image_rect = image.get_rect(center=(position))
                     main_surface.blit(image, image_rect)
-            print(i)
         self.surface = main_surface
 
     def _initialize_timer(self) -> None:
@@ -70,7 +70,7 @@ class Particles:
         self.time["initial_time"] = current_time
         self.time["time_counter"] += self.time["time_elapsed"]
 
-    def render(self) -> None:
+    def render(self) -> str:
         self._update_timer()
         rect = self.surface.get_rect(
             center=(self.position[0] + MODULE_SIZE / 2, self.position[1] + MODULE_SIZE / 2)

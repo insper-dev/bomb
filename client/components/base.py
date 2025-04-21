@@ -4,8 +4,16 @@ from typing import Literal
 
 import pygame
 
-from core.constants import FONT_SIZE_MAP, FONT_STYLES, SIZE_MAP, VARIANT_MAP
-from core.types import Cordinates, Font_Path, Thickness
+from core.constants import FONT_MAP, FONT_SIZE_MAP, SIZE_MAP, VARIANT_MAP
+from core.types import (
+    ComponentSize,
+    ComponentType,
+    ComponentVariant,
+    Coordinate,
+    FontSize,
+    FontStyle,
+    Thickness,
+)
 
 
 class BaseComponent(ABC):
@@ -16,11 +24,11 @@ class BaseComponent(ABC):
     def __init__(
         self,
         window: pygame.Surface,
-        position: tuple[int, int],
+        position: Coordinate,
         label: str,
-        variant: Literal["standard", "primary", "secondary", "outline"] = "standard",
-        size: Literal["sm", "md", "lg"] = "md",
-        text_type: Literal["standard", "title", "subtitle", "text"] = "standard",
+        variant: ComponentVariant = "standard",
+        size: ComponentSize = "md",
+        text_type: FontSize = "standard",
         hover: bool = True,
         is_topleft: bool = False,
         *,
@@ -31,7 +39,7 @@ class BaseComponent(ABC):
 
         Args:
             window (pygame.Surface): The window where the component will be drawn.
-            position (tuple[int, int]): The position of the component.
+            position (Coordinate): The position of the component.
             variant (str): The variant of the component.
             size (str): The size of the component.
             callback (Callable): A callback function to be executed on click.
@@ -39,15 +47,17 @@ class BaseComponent(ABC):
         self.label = label
         self.window = window
         self.position = position
-        self.variant = variant
-        self.size = size
-        self.text_type = text_type
+        self.variant: ComponentVariant = variant
+        self.size: ComponentSize = size
+        self.text_type: FontSize = text_type
         self.hover = hover
         self.callback = callback
         self.is_topleft = is_topleft
         self.is_focused = False
-        self.is_dissabled = False
-        self.type = self.__class__.__name__.lower()
+        self.is_disabled = False
+        # ! Warning: ter cuidado com a poha do nome da classe!!!
+        # ! Se por acaso mudar o nome da classe, precisa mudar o "ComponentType"
+        self.type: ComponentType = self.__class__.__name__.lower()  # type: ignore
         self.surface = self._init_surface()
         self.rect = (
             self.surface.get_rect(topleft=position)
@@ -68,30 +78,27 @@ class BaseComponent(ABC):
         """
         return pygame.surface.Surface(size, flags=pygame.SRCALPHA)
 
-    def _get_color(self, surface_part: Literal["bg", "text", "border"]) -> tuple[int, int, int]:
+    def _get_color(self, surface_part: Literal["bg", "text", "border"]) -> pygame.Color:
         """
         Get the color of the component based on its part.
         """
-        colors = VARIANT_MAP[self.is_dissabled][self.is_focused]
+        colors = VARIANT_MAP[self.is_disabled][self.is_focused]
 
         return colors[self.variant][surface_part]
 
-    def _get_font(self, font_style: Font_Path | None = None) -> pygame.font.Font:
+    def _get_font(self, font_style: FontStyle | None = None) -> pygame.font.Font:
         """
         Get the font of the component.
         """
-
         font_size = FONT_SIZE_MAP[self.is_focused][self.text_type][self.size]
-        font_style = FONT_STYLES[font_style]
-        font = pygame.font.Font(font_style, font_size)
+        font = FONT_MAP[font_style] if font_style else None
 
-        return font
+        return pygame.font.Font(font, font_size)
 
-    def _get_size(self) -> tuple[Cordinates, Thickness]:
+    def _get_size(self) -> tuple[Coordinate, Thickness]:
         """
         Get the size of the component.
         """
-
         sizes = SIZE_MAP[self.is_focused][self.type]
 
         return sizes[self.size]
@@ -129,7 +136,7 @@ class BaseComponent(ABC):
         """
         Handle events for the component.
         """
-        if self.is_dissabled:
+        if self.is_disabled:
             return
         self._handle_event(event)
         self._handle_hover(event)

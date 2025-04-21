@@ -131,7 +131,9 @@ async def game_ws(websocket: WebSocket, game_id: str) -> None:
                 await game_service.broadcast_state(game_id)
             elif ev.event == "place_bomb":
                 # coloca bomba e agenda explosão
-                await game_service.place_bomb(game_id, user.id, ev.x, ev.y, ev.radius, ev.time)
+                await game_service.place_bomb(
+                    game_id, user.id, ev.x, ev.y, ev.radius, ev.explosion_time
+                )
     except WebSocketDisconnect:
         game_service.remove_connection(game_id, websocket)
         return

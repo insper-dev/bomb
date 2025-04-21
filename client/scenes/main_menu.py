@@ -1,6 +1,6 @@
 import pygame
 
-from client.components import BaseComponent, Button, State, TextArea
+from client.components import BaseComponent, Button, State, Text
 from client.scenes.base import BaseScene, Scenes
 
 
@@ -12,7 +12,7 @@ class MainMenuScene(BaseScene):
         self.active_button = 0
 
         self.non_interative: list[BaseComponent] = [
-            TextArea(
+            Text(
                 self.app.screen,
                 position=(self.app.screen_center[0], int(self.app.screen_center[1] * 0.6)),
                 label="Lara Bomb Online",
@@ -20,7 +20,7 @@ class MainMenuScene(BaseScene):
                 size="lg",
                 text_type="title",
             ),
-            TextArea(
+            Text(
                 self.app.screen,
                 position=(self.app.screen_center[0], int(self.app.screen_center[1] * 1.8)),
                 label="Click play to sign in your account or Sign-in",
@@ -88,15 +88,15 @@ class MainMenuScene(BaseScene):
         self.app.screen.fill((1, 5, 68))
 
         if self.app.auth_service.is_logged_in and (user := self.app.auth_service.current_user):
-            self.interative_components[3].is_dissabled = False
+            self.interative_components[3].is_disabled = False
             self.non_interative[1].label = f"Welcome: {user.username}"
         else:
-            self.interative_components[3].is_dissabled = True
+            self.interative_components[3].is_disabled = True
             self.non_interative[1].label = "Click play to sign in your account or Sign-in"
 
         # FIXME: "active" is not an attribute of BaseComponent.
         if self.interative_components[3].active:
-            self.interative_components[3].is_dissabled = True
+            self.interative_components[3].is_disabled = True
 
     def changing_focus(self, event: pygame.event.Event) -> None:
         """

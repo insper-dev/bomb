@@ -1,9 +1,10 @@
 import pygame
-import pygame.font
 
-from client.components import BaseComponent, Button, Input, State, TextArea
+from client.components import BaseComponent, Button, Input, State, Text
 from client.scenes.base import BaseScene, Scenes
 from core.constants import BLACK
+
+# !! TODO: REFATORAR A BASE COMPONENT PARA FAZER VALIDAÇÃO DOS ATRIBUTOS
 
 
 class LoginScene(BaseScene):
@@ -20,7 +21,10 @@ class LoginScene(BaseScene):
         self.interative_components: list[BaseComponent] = [
             Input(
                 self.app.screen,
-                position=(self.app.screen_center[0] * 0.5, self.app.screen_center[1] * 0.8),
+                position=(
+                    int(self.app.screen_center[0] * 0.5),
+                    int(self.app.screen_center[1] * 0.8),
+                ),
                 label=r"Username\h",
                 text_type="text",
                 is_topleft=True,
@@ -28,7 +32,10 @@ class LoginScene(BaseScene):
             ),
             Input(
                 self.app.screen,
-                position=(self.app.screen_center[0] * 0.5, self.app.screen_center[1] * 1.2),
+                position=(
+                    int(self.app.screen_center[0] * 0.5),
+                    int(self.app.screen_center[1] * 1.2),
+                ),
                 label=r"Password\h",
                 text_type="text",
                 is_topleft=True,
@@ -36,7 +43,10 @@ class LoginScene(BaseScene):
             ),
             State(
                 self.app.screen,
-                position=(self.app.screen_center[0] * 0.5, self.app.screen_center[1] * 1.45),
+                position=(
+                    int(self.app.screen_center[0] * 0.5),
+                    int(self.app.screen_center[1] * 1.45),
+                ),
                 label="Submit",
                 text_type="standard",
                 is_topleft=True,
@@ -44,7 +54,10 @@ class LoginScene(BaseScene):
             ),
             Button(
                 self.app.screen,
-                position=(self.app.screen_center[0] * 0.1, self.app.screen_center[1] * 1.85),
+                position=(
+                    int(self.app.screen_center[0] * 0.1),
+                    int(self.app.screen_center[1] * 1.85),
+                ),
                 label="back",
                 text_type="standard",
                 variant="outline",
@@ -54,7 +67,10 @@ class LoginScene(BaseScene):
             ),
             Button(
                 self.app.screen,
-                position=(self.app.screen_center[0] * 1.62, self.app.screen_center[1] * 1.85),
+                position=(
+                    int(self.app.screen_center[0] * 1.62),
+                    int(self.app.screen_center[1] * 1.85),
+                ),
                 label="Sing-in",
                 text_type="standard",
                 variant="outline",
@@ -64,32 +80,38 @@ class LoginScene(BaseScene):
             ),
         ]
         self.non_interative: list[BaseComponent] = [
-            TextArea(
+            Text(
                 self.app.screen,
-                position=(self.app.screen_center[0], self.app.screen_center[1] * 0.35),
+                position=(self.app.screen_center[0], int(self.app.screen_center[1] * 0.35)),
                 label="Login",
                 text_type="title",
                 hover=False,
             ),
-            TextArea(
+            Text(
                 self.app.screen,
-                position=(self.app.screen_center[0] * 0.5, self.app.screen_center[1] * 0.65),
+                position=(
+                    int(self.app.screen_center[0] * 0.5),
+                    int(self.app.screen_center[1] * 0.65),
+                ),
                 label="Username",
                 text_type="subtitle",
                 hover=False,
                 is_topleft=True,
             ),
-            TextArea(
+            Text(
                 self.app.screen,
-                position=(self.app.screen_center[0] * 0.5, self.app.screen_center[1] * 1.05),
+                position=(
+                    int(self.app.screen_center[0] * 0.5),
+                    int(self.app.screen_center[1] * 1.05),
+                ),
                 label="Password",
                 text_type="subtitle",
                 hover=False,
                 is_topleft=True,
             ),
-            TextArea(
+            Text(
                 self.app.screen,
-                position=(self.app.screen_center[0], self.app.screen_center[1] * 1.7),
+                position=(self.app.screen_center[0], int(self.app.screen_center[1] * 1.7)),
                 label="",
                 text_type="text",
                 hover=False,
@@ -109,7 +131,7 @@ class LoginScene(BaseScene):
         elif event.type == pygame.KEYDOWN:
             inputs: list[Input] = [self.interative_components[0], self.interative_components[1]]
             buttons: list[Button] = [self.interative_components[3], self.interative_components[4]]
-            keys: dict[pygame.event.EventType : int] = {
+            keys: dict[pygame.event.EventType, str] = {
                 pygame.K_LEFT: "left",
                 pygame.K_RIGHT: "right",
                 pygame.K_TAB: "tab",
@@ -161,7 +183,7 @@ class LoginScene(BaseScene):
                 self.error_message = error
 
         if self.components[2].active:
-            self.components[2].is_dissabled = True
+            self.components[2].is_disabled = True
 
         # Call parent update to handle events
         super().update()
@@ -203,17 +225,17 @@ class LoginScene(BaseScene):
 
         if self.app.auth_service.is_logged_in:
             self.app.current_scene = Scenes.MAIN_MENU
-        self.interative_components[2].is_dissabled = False
+        self.interative_components[2].is_disabled = False
 
     def _on_login_error(self, error_message: str) -> None:
         """Called when login/signup fails"""
         self.show_error = True
         self.error_message = error_message
-        self.components[2].is_dissabled = False
+        self.components[2].is_disabled = False
 
     def change_scene(
         self,
-        scene: BaseScene,
+        scene: Scenes,
         alt_scene_conditioned: tuple[bool | None, BaseScene] = (None, BaseScene),
     ) -> None:
         condition, alt_scene = alt_scene_conditioned

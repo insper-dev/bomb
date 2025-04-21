@@ -1,6 +1,6 @@
 import pygame
 
-from client.components import BaseComponent, TextArea
+from client.components import BaseComponent, Text
 from client.scenes.base import BaseScene, Scenes
 from core.constants import PURPLE
 
@@ -20,13 +20,13 @@ class InitialScene(BaseScene):
         instruction_y = int(self.app.screen_center[1] * 1.2)
 
         self.non_interactive: list[BaseComponent] = [
-            TextArea(
+            Text(
                 self.app.screen,
                 position=(self.app.screen_center[0], title_y),
                 label="LaraBomb Online",
                 text_type="title",
             ),
-            TextArea(
+            Text(
                 self.app.screen,
                 position=(self.app.screen_center[0], subtitle_y),
                 label="Welcome to where bombs can be legally placed",
@@ -34,7 +34,7 @@ class InitialScene(BaseScene):
                 variant="primary",
                 hover=False,
             ),
-            TextArea(
+            Text(
                 self.app.screen,
                 position=(self.app.screen_center[0], instruction_y),
                 label="Click anywhere or press Enter to continue",

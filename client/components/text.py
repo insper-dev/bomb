@@ -3,10 +3,10 @@ import pygame
 from client.components import BaseComponent
 
 
-class TextArea(BaseComponent):
+class Text(BaseComponent):
     def _init_surface(self) -> pygame.Surface:
         """
-        Initialize the surface of the TextArea.
+        Initialize the surface of the Text.
         """
         # Create the text surface
         font = self._get_font()

@@ -7,8 +7,8 @@ class Input(BaseComponent):
     def __init__(
         self,
         window,
-        label,
         position,
+        label,
         variant="standard",
         size="md",
         text_type="standard",

@@ -1,44 +1,59 @@
 from pathlib import Path
-from typing import Literal
 
 import pygame
 
-from core.types import Cordinates, Thickness, comp, is_disabled, is_focused
+from core.types import (
+    ComponentSize,
+    ComponentType,
+    ComponentVariant,
+    Coordinate,
+    FontSize,
+    FontStyle,
+    IsDisabled,
+    IsFocused,
+    ParticleType,
+    PlayerDirectionState,
+    Thickness,
+)
 
 pygame.init()
 
 ROOT = Path(__file__).parent.parent
 
+ASSETS_PATH = ROOT / "client" / "assets"
+IMAGES_PATH = ASSETS_PATH / "images"
 
 SESSION_FILE = ROOT / ".session.json"
 
 # Constants for the game
 
 # Color constants
-PURPLE = (1, 5, 68)
-ROSE = (243, 45, 107)
-WHITE = (255, 255, 255)
-WHITE_GRAY = (200, 200, 200)
-SOUTH_GRAY = (180, 180, 180)
-GRAY = (128, 128, 128)
-BLACK = (0, 0, 0)
-YELLOW = (243, 255, 107)
-BLUE = (0, 0, 255)
-GREEN = (0, 255, 0)
+PURPLE = pygame.Color(1, 5, 68)
+ROSE = pygame.Color(243, 45, 107)
+WHITE = pygame.Color(255, 255, 255)
+WHITE_GRAY = pygame.Color(200, 200, 200)
+SOUTH_GRAY = pygame.Color(180, 180, 180)
+GRAY = pygame.Color(128, 128, 128)
+BLACK = pygame.Color(0, 0, 0)
+YELLOW = pygame.Color(243, 255, 107)
+BLUE = pygame.Color(0, 0, 255)
+GREEN = pygame.Color(0, 255, 0)
 
 
 # Constants for the components
+FOCUSED = ENABLED = True
+NOT_FOCUSED = DISABLED = False
 
 SIZE_MAP: dict[
-    is_focused : dict[comp : dict[Literal["sm", "md", "lg"] : tuple[Cordinates, Thickness]]]
+    IsFocused, dict[ComponentType, dict[ComponentSize, tuple[Coordinate, Thickness]]]
 ] = {
-    False: {
+    NOT_FOCUSED: {
         "button": {
             "sm": ((100, 30), 2),
             "md": ((150, 40), 3),
             "lg": ((200, 50), 4),
         },
-        "text_area": {
+        "text": {
             "sm": ((100, 30), 2),
             "md": ((150, 40), 3),
             "lg": ((200, 50), 4),
@@ -54,13 +69,13 @@ SIZE_MAP: dict[
             "lg": ((220, 50), 4),
         },
     },
-    True: {
+    FOCUSED: {
         "button": {
             "sm": ((110, 35), 3),
             "md": ((160, 45), 4),
             "lg": ((210, 55), 5),
         },
-        "text area": {
+        "text": {
             "sm": ((110, 35), 3),
             "md": ((160, 45), 4),
             "lg": ((210, 55), 5),
@@ -79,28 +94,22 @@ SIZE_MAP: dict[
 }
 
 
-VARIANT_MAP: dict[
-    is_disabled : dict[
-        is_focused : dict[
-            Literal["standard", "primary", "secondary", "outline"], dict[str, pygame.color.Color]
-        ]
-    ]
-] = {
-    False: {
-        False: {
+VARIANT_MAP: dict[IsDisabled, dict[IsFocused, dict[ComponentVariant, dict[str, pygame.Color]]]] = {
+    DISABLED: {
+        NOT_FOCUSED: {
             "standard": {"bg": PURPLE, "text": ROSE, "border": WHITE},
             "primary": {"bg": BLUE, "text": WHITE, "border": BLACK},
             "secondary": {"bg": GREEN, "text": WHITE, "border": BLACK},
             "outline": {"bg": WHITE, "text": BLACK, "border": BLACK},
         },
-        True: {
+        FOCUSED: {
             "standard": {"bg": PURPLE, "text": YELLOW, "border": WHITE},
             "primary": {"bg": BLUE, "text": GRAY, "border": GRAY},
             "secondary": {"bg": GREEN, "text": GRAY, "border": GRAY},
             "outline": {"bg": WHITE, "text": GRAY, "border": GRAY},
         },
     },
-    True: {
+    ENABLED: {
         False: {
             "standard": {"bg": WHITE, "text": BLACK, "border": BLACK},
             "primary": {"bg": BLUE, "text": WHITE, "border": BLACK},
@@ -116,23 +125,15 @@ VARIANT_MAP: dict[
     },
 }
 
-FONT_STYLES: dict[
-    Literal["normal", "bold", "italic", "bold_italic"],
-    tuple[str, int],
-] = {
-    None: None,
+FONT_MAP: dict[FontStyle, str] = {
     "normal": "freesansbold.ttf",
     "bold": "freesansbold.ttf",
     "italic": "freesansbold.ttf",
     "bold_italic": "freesansbold.ttf",
 }
 
-FONT_SIZE_MAP: dict[
-    is_focused : dict[
-        Literal["standard", "title", "subtitle", "text"] : dict[Literal["sm", "md", "lg"], int]
-    ]
-] = {
-    False: {
+FONT_SIZE_MAP: dict[IsFocused, dict[FontSize, dict[ComponentSize, int]]] = {
+    NOT_FOCUSED: {
         "standard": {
             "sm": 20,
             "md": 24,
@@ -154,7 +155,7 @@ FONT_SIZE_MAP: dict[
             "lg": 24,
         },
     },
-    True: {
+    FOCUSED: {
         "standard": {
             "sm": 22,
             "md": 26,
@@ -179,44 +180,44 @@ FONT_SIZE_MAP: dict[
 }
 
 # Game constants
-
 GAME_ALPHABET_KEYS = [pygame.key.key_code(key) for key in "abcdefghijklmnopqrstuvwxyz"]
 
 MODULE_SIZE = 64
 
-# Bomb
 
+# Bomb
+BOMB_PATH = IMAGES_PATH / "bomb"
 BOMB_COKING: list[pygame.Surface] = [
     pygame.transform.scale(
-        pygame.image.load(Path("client/assets/images/Bomb/bomb_state_1.png")),
+        pygame.image.load(BOMB_PATH / "bomb_state_1.png"),
         (MODULE_SIZE, MODULE_SIZE),
     ),
     pygame.transform.scale(
-        pygame.image.load(Path("client/assets/images/Bomb/bomb_state_2.png")),
+        pygame.image.load(BOMB_PATH / "bomb_state_2.png"),
         (MODULE_SIZE, MODULE_SIZE),
     ),
     pygame.transform.scale(
-        pygame.image.load(Path("client/assets/images/Bomb/bomb_state_3.png")),
+        pygame.image.load(BOMB_PATH / "bomb_state_3.png"),
         (MODULE_SIZE, MODULE_SIZE),
     ),
     pygame.transform.scale(
-        pygame.image.load(Path("client/assets/images/Bomb/bomb_state_4.png")),
+        pygame.image.load(BOMB_PATH / "bomb_state_4.png"),
         (MODULE_SIZE, MODULE_SIZE),
     ),
     pygame.transform.scale(
-        pygame.image.load(Path("client/assets/images/Bomb/bomb_state_5.png")),
+        pygame.image.load(BOMB_PATH / "bomb_state_5.png"),
         (MODULE_SIZE, MODULE_SIZE),
     ),
 ]
 
 # Particles
 
-
-EXPLOSION_PARTICLES: dict[Literal["geo", "tip", "tail"], list[pygame.Surface]] = {
+PARTICLES_PATH = IMAGES_PATH / "particles"
+EXPLOSION_PARTICLES: dict[ParticleType, list[pygame.Surface]] = {
     "geo": [
         pygame.transform.rotate(
             pygame.transform.scale(
-                pygame.image.load(Path("client/assets/images/particles/particles_geo.jpeg")),
+                pygame.image.load(PARTICLES_PATH / "particles_geo.jpeg"),
                 (MODULE_SIZE, MODULE_SIZE),
             ),
             angle,
@@ -226,7 +227,7 @@ EXPLOSION_PARTICLES: dict[Literal["geo", "tip", "tail"], list[pygame.Surface]] =
     "tip": [
         pygame.transform.rotate(
             pygame.transform.scale(
-                pygame.image.load(Path("client/assets/images/particles/particles_tip.jpeg")),
+                pygame.image.load(PARTICLES_PATH / "particles_tip.jpeg"),
                 (MODULE_SIZE, MODULE_SIZE),
             ),
             angle,
@@ -236,7 +237,7 @@ EXPLOSION_PARTICLES: dict[Literal["geo", "tip", "tail"], list[pygame.Surface]] =
     "tail": [
         pygame.transform.rotate(
             pygame.transform.scale(
-                pygame.image.load(Path("client/assets/images/particles/particles_tail.jpeg")),
+                pygame.image.load(PARTICLES_PATH / "particles_tail.jpeg"),
                 (MODULE_SIZE, MODULE_SIZE),
             ),
             angle,
@@ -245,32 +246,28 @@ EXPLOSION_PARTICLES: dict[Literal["geo", "tip", "tail"], list[pygame.Surface]] =
     ],
 }
 
-print(
-    EXPLOSION_PARTICLES,
-    pygame.image.load(Path("client/assets/images/particles/particles_tail.jpeg")),
-)
-
 # Players
-
-CARLITOS: dict[Literal["up", "down", "left", "right", "stand_by"], list[pygame.Surface]] = {
+# TODO: explícito é melhor que implícito.
+CARLITOS_PATH = IMAGES_PATH / "carlitos_player"
+CARLITOS: dict[PlayerDirectionState, list[pygame.Surface]] = {
     "right": [
         pygame.transform.scale(
-            pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_1.jpeg")),
+            pygame.image.load(CARLITOS_PATH / "horizontal_1.jpeg"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
         pygame.transform.scale(
-            pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_2.jpeg")),
+            pygame.image.load(CARLITOS_PATH / "horizontal_2.jpeg"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
         pygame.transform.scale(
-            pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_3.jpeg")),
+            pygame.image.load(CARLITOS_PATH / "horizontal_3.jpeg"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
     ],
     "left": [
         pygame.transform.flip(
             pygame.transform.scale(
-                pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_1.jpeg")),
+                pygame.image.load(CARLITOS_PATH / "horizontal_1.jpeg"),
                 (MODULE_SIZE, MODULE_SIZE),
             ),
             True,
@@ -278,7 +275,7 @@ CARLITOS: dict[Literal["up", "down", "left", "right", "stand_by"], list[pygame.S
         ),
         pygame.transform.flip(
             pygame.transform.scale(
-                pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_2.jpeg")),
+                pygame.image.load(CARLITOS_PATH / "horizontal_2.jpeg"),
                 (MODULE_SIZE, MODULE_SIZE),
             ),
             True,
@@ -286,7 +283,7 @@ CARLITOS: dict[Literal["up", "down", "left", "right", "stand_by"], list[pygame.S
         ),
         pygame.transform.flip(
             pygame.transform.scale(
-                pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_3.jpeg")),
+                pygame.image.load(CARLITOS_PATH / "horizontal_3.jpeg"),
                 (MODULE_SIZE, MODULE_SIZE),
             ),
             True,
@@ -295,35 +292,35 @@ CARLITOS: dict[Literal["up", "down", "left", "right", "stand_by"], list[pygame.S
     ],
     "down": [
         pygame.transform.scale(
-            pygame.image.load(Path("client/assets/images/carlitos_player/front_1.jpeg")),
+            pygame.image.load(CARLITOS_PATH / "front_1.jpeg"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
         pygame.transform.scale(
-            pygame.image.load(Path("client/assets/images/carlitos_player/front_2.jpeg")),
+            pygame.image.load(CARLITOS_PATH / "front_2.jpeg"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
         pygame.transform.scale(
-            pygame.image.load(Path("client/assets/images/carlitos_player/front_3.jpeg")),
+            pygame.image.load(CARLITOS_PATH / "front_3.jpeg"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
     ],
     "up": [
         pygame.transform.scale(
-            pygame.image.load(Path("client/assets/images/carlitos_player/back_1.jpeg")),
+            pygame.image.load(CARLITOS_PATH / "back_1.jpeg"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
         pygame.transform.scale(
-            pygame.image.load(Path("client/assets/images/carlitos_player/back_2.jpeg")),
+            pygame.image.load(CARLITOS_PATH / "back_2.jpeg"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
         pygame.transform.scale(
-            pygame.image.load(Path("client/assets/images/carlitos_player/back_3.jpeg")),
+            pygame.image.load(CARLITOS_PATH / "back_3.jpeg"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
     ],
     "stand_by": [
         pygame.transform.scale(
-            pygame.image.load(Path("client/assets/images/carlitos_player/horizontal_2.jpeg")),
+            pygame.image.load(CARLITOS_PATH / "horizontal_2.jpeg"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
     ],

@@ -1,6 +1,6 @@
 import pygame
 
-from client.components import BaseComponent, TextArea
+from client.components import BaseComponent, Text
 from client.scenes.base import BaseScene, Scenes
 
 
@@ -19,13 +19,9 @@ class StartScene(BaseScene):
 
     def _initialize_texts(self) -> None:
         self.texts: list[BaseComponent] = [
-            TextArea(
-                self.app.screen, self.app.screen_center, "Pygame Community", text_type="title"
-            ),
-            TextArea(self.app.screen, self.app.screen_center, "Moriaty", text_type="title"),
-            TextArea(
-                self.app.screen, self.app.screen_center, "Margenta Production", text_type="title"
-            ),
+            Text(self.app.screen, self.app.screen_center, "Pygame Community", text_type="title"),
+            Text(self.app.screen, self.app.screen_center, "Moriaty", text_type="title"),
+            Text(self.app.screen, self.app.screen_center, "Margenta Production", text_type="title"),
         ]
 
     def render(self) -> None:

@@ -1,9 +1,30 @@
 from pathlib import Path
 from typing import Literal
 
-Cordinates = tuple[int, int]
-Thickness = int
-is_focused = bool
-is_disabled = bool
-Font_Path = Path
-type comp = Literal["button", "text_area"]
+type Coordinate = tuple[int, int]
+type Thickness = int
+type IsFocused = bool
+type IsDisabled = bool
+type FontPath = Path
+type ComponentType = Literal["button", "text", "input", "state"]
+type ComponentSize = Literal["sm", "md", "lg"]
+type ComponentVariant = Literal["standard", "primary", "secondary", "outline"]
+type FontStyle = Literal["normal", "bold", "italic", "bold_italic"]
+type FontSize = Literal["standard", "title", "subtitle", "text"]
+type ParticleType = Literal["geo", "tip", "tail"]
+type PlayerDirectionState = Literal["up", "down", "left", "right", "stand_by"]
+
+__all__ = [
+    "ComponentSize",
+    "ComponentType",
+    "ComponentVariant",
+    "Coordinate",
+    "FontPath",
+    "FontSize",
+    "FontStyle",
+    "IsDisabled",
+    "IsFocused",
+    "ParticleType",
+    "PlayerDirectionState",
+    "Thickness",
+]

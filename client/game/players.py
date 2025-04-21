@@ -1,8 +1,9 @@
-from typing import Any, Literal
+from typing import Literal
 
 import pygame
 
 from core.constants import CARLITOS
+from core.types import PlayerDirectionState
 
 
 class Player:
@@ -10,7 +11,7 @@ class Player:
         self,
         screen: pygame.Surface,
         position: tuple[int, int],
-        images: dict[Literal["up", "down", "left", "right", "stand_by"], list[pygame.Surface]],
+        images: dict[PlayerDirectionState, list[pygame.Surface]],
         map: dict | None = None,
     ) -> None:
         self.screen = screen
@@ -19,8 +20,8 @@ class Player:
         self.sprites = images
         self.sprites_index: int = 0
         self.velocity: int = 1
-        self.moviment_state: Literal["stand_by", "left", "right", "down", "up"] = "stand_by"
-        self.status: dict[Literal["vidas", "power", "active_power_up"], Any] = {
+        self.moviment_state: PlayerDirectionState = "stand_by"
+        self.status: dict[Literal["vidas", "power", "active_power_up"], int | None] = {
             "vidas": 10,
             "power": 1,
             "active_power_up": None,
