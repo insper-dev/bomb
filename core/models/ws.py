@@ -4,6 +4,8 @@ from typing import Annotated, Literal
 from prisma.partials import Opponent
 from pydantic import BaseModel, Field, TypeAdapter
 
+from core.types import PlayerDirectionState
+
 
 class WebSocketCloseCode(IntEnum):
     """Custom close codes for WebSocket"""
@@ -17,15 +19,25 @@ class WebSocketCloseCode(IntEnum):
 
 class MovimentEvent(BaseModel):
     event: Literal["move"] = "move"
-    direction: Literal["up", "down", "left", "right"]
+    direction: PlayerDirectionState
+
+    @staticmethod
+    def dxdy(direction: PlayerDirectionState) -> tuple[int, int]:
+        if direction == "up":
+            return (0, -1)
+        if direction == "down":
+            return (0, 1)
+        if direction == "left":
+            return (-1, 0)
+        if direction == "right":
+            return (1, 0)
+        return (0, 0)
 
 
 class PlaceBombEvent(BaseModel):
     event: Literal["place_bomb"] = "place_bomb"
     x: int
     y: int
-    radius: int = Field(default=1)
-    explosion_time: float
 
 
 GameEventType = Annotated[MovimentEvent | PlaceBombEvent, Field(discriminator="event")]

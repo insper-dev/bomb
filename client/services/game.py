@@ -1,20 +1,19 @@
 import asyncio
 import json
 import threading
+from collections.abc import Callable
 
-from websockets import ClientConnection, ConnectionClosed, connect
+from websockets import ConnectionClosed, connect
+from websockets.client import ClientConnection
 
 from client.services.base import ServiceBase
-from core.models.game import GameState, GameStatus
+from core.models.game import BombState, GameState, GameStatus
 from core.models.ws import MovimentEvent, PlaceBombEvent
 from core.types import PlayerDirectionState
 
 
 class GameService(ServiceBase):
-    """
-    Service to handle game WebSocket communication for client (e.g., Pygame).
-    Maintains current game state and propagates updates via callbacks.
-    """
+    """Client service for real-time game WebSocket communication and immediate state feedback."""
 
     def __init__(self, app) -> None:
         super().__init__(app)
@@ -22,164 +21,116 @@ class GameService(ServiceBase):
         self.state: GameState | None = None
         self.running: bool = False
         self.match_id: str | None = None
+        self._token: str | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
-        self._game_ended_callbacks = []
+        self._game_ended_callbacks: list[Callable[[GameStatus, str | None], None]] = []
 
-    def register_game_ended_callback(self, callback) -> None:
-        """Register a callback for when the game ends"""
+    def register_game_ended_callback(
+        self, callback: Callable[[GameStatus, str | None], None]
+    ) -> None:
+        """Register a callback for when the game ends."""
         self._game_ended_callbacks.append(callback)
 
-    def start(self, match_id: str | None = None) -> None:
-        """Start WebSocket connection to game server."""
-        if match_id:
-            self.match_id = match_id
-        if not self.match_id:
-            raise RuntimeError("No match ID provided")
+    def start(self, match_id: str) -> None:
+        """Start WebSocket thread for real-time game updates."""
+        if self.running:
+            return
+        self.match_id = match_id
         token = self.app.api_client.auth_token
         if not token:
             raise RuntimeError("User not authenticated")
-        if self.running:
-            return
+        self._token = token
         self.running = True
         self._loop = asyncio.new_event_loop()
-        self._thread = threading.Thread(
-            target=self._run_loop, args=(self.match_id, token), daemon=True
-        )
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
-        """Stop WebSocket loop and close connection."""
+        """Stop the WebSocket loop and close the connection."""
         if not self.running:
             return
-
         self.running = False
-
-        # Verificar se estamos na mesma thread do loop - se sim, não podemos interrompê-lo aqui
-        current_thread = threading.current_thread()
-        if self._thread and current_thread == self._thread:
-            print("Warning: Trying to stop game service from its own thread!")
-            return
-
-        # Estamos em thread diferente, podemos fechar o websocket
         if self.websocket and self._loop:
-            try:
-                asyncio.run_coroutine_threadsafe(self.websocket.close(), self._loop)
-            except Exception as e:
-                print(f"Error closing websocket: {e}")
-
-        # Paramos o loop
-        if self._loop:
-            try:
-                self._loop.call_soon_threadsafe(self._loop.stop)
-            except Exception as e:
-                print(f"Error stopping event loop: {e}")
-
-        # Esperamos que a thread termine (com timeout)
+            asyncio.run_coroutine_threadsafe(self.websocket.close(), self._loop)
+            self._loop.call_soon_threadsafe(self._loop.stop)
         if self._thread and self._thread.is_alive():
-            try:
-                self._thread.join(timeout=1)
-            except Exception as e:
-                print(f"Error joining thread: {e}")
+            self._thread.join(timeout=1)
 
     def send_move(self, direction: PlayerDirectionState) -> None:
-        """Send a move command: 'up', 'down', 'left' or 'right', 'stand_by."""
-        if not self.running or not self.websocket or not self._loop:
+        """
+        Send a movement event to the server and apply local update for instant feedback.
+        """
+        if not (self.running and self.websocket and self._loop and self.state):
             return
-
-        # Don't send moves if the game has ended
-        if self.state and self.state.status != GameStatus.PLAYING:
+        if self.state.status != GameStatus.PLAYING:
             return
-
-        try:
-            payload = MovimentEvent(direction=direction).model_dump()
-            asyncio.run_coroutine_threadsafe(self.websocket.send(json.dumps(payload)), self._loop)
-        except Exception:
-            pass
+        user = self.app.auth_service.current_user
+        if not user:
+            return
+        # Local state update
+        dx, dy = MovimentEvent.dxdy(direction)
+        self.state.move_player(user.id, dx, dy, direction)
+        # Send to server
+        ev = MovimentEvent(direction=direction)
+        asyncio.run_coroutine_threadsafe(
+            self.websocket.send(json.dumps(ev.model_dump())), self._loop
+        )
 
     def send_bomb(self) -> None:
-        if not self.running or not self.websocket or not self._loop or not self.state:
+        """
+        Send a place bomb event to the server and update local state immediately.
+        """
+        if not (self.running and self.websocket and self._loop and self.state):
             return
-
-        if not self.app.auth_service.current_user:
+        user = self.app.auth_service.current_user
+        if not user:
             return
-
-        uid = self.app.auth_service.current_user.id
-        p = self.state.players.get(uid)
-        if not p:
+        pstate = self.state.players.get(user.id)
+        if not pstate:
             return
-        try:
-            # TODO: esse radius deve ser definido pelo servidor com base nos power-ups ativos.
-            ev = PlaceBombEvent(x=p.x, y=p.y, radius=2, explosion_time=1)
-            asyncio.run_coroutine_threadsafe(self.websocket.send(ev.model_dump_json()), self._loop)
-        except Exception:
-            pass
+        # Local update
+        bomb = BombState(x=pstate.x, y=pstate.y)
+        self.state.add_bomb(user.id, bomb)
+        # Send to server
+        ev = PlaceBombEvent(x=bomb.x, y=bomb.y)
+        asyncio.run_coroutine_threadsafe(self.websocket.send(ev.model_dump_json()), self._loop)
 
-    @property
-    def is_game_ended(self) -> bool:
-        """Check if the game has ended"""
-        if not self.state:
-            return False
-        return self.state.status != GameStatus.PLAYING
-
-    @property
-    def game_result(self) -> str:
-        """Get the game result text"""
-        if not self.state or self.state.status == GameStatus.PLAYING:
-            return "Game in progress"
-
-        if self.state.status == GameStatus.DRAW:
-            return "Game ended in a draw"
-
-        if self.state.winner_id:
-            user = self.app.auth_service.current_user
-            if user and user.id == self.state.winner_id:
-                return "You won!"
-            return "You lost!"
-
-        return "Game ended"
-
-    def _run_loop(self, game_id: str, token: str) -> None:
+    def _run_loop(self) -> None:
+        """Internal: run event loop and establish connection."""
         asyncio.set_event_loop(self._loop)
         if not self._loop:
             return
-        self._loop.run_until_complete(self._connect(game_id, token))
+        self._loop.run_until_complete(self._connect())
 
-    async def _connect(self, game_id: str, token: str) -> None:
+    async def _connect(self) -> None:
+        """Coroutine to manage WebSocket connection and incoming messages."""
         protocol = "wss" if self.app.settings.server_endpoint_ssl else "ws"
-        uri = f"{protocol}://{self.app.settings.server_endpoint}/ws/game/{game_id}?token={token}"
+        uri = f"{protocol}://{self.app.settings.server_endpoint}/ws/game/{self.match_id}?token={self._token}"
         try:
             async with connect(uri) as ws:
                 self.websocket = ws
-                previous_status = None
-
+                previous_status: GameStatus | None = None
                 while self.running:
                     try:
                         raw = await ws.recv()
                         data = json.loads(raw)
                         self.state = GameState.model_validate(data)
-
-                        # Check for game end
+                        # Detect end of game
                         if (
                             previous_status == GameStatus.PLAYING
                             and self.state.status != GameStatus.PLAYING
                         ):
-                            # trigger end callbacks
-                            for callback in self._game_ended_callbacks:
-                                try:
-                                    callback(self.state.status, self.state.winner_id)
-                                except Exception as e:
-                                    print(f"Error in game end callback: {e}")
-                            self.running = False
-                            await ws.close()
+                            for cb in self._game_ended_callbacks:
+                                cb(self.state.status, self.state.winner_id)
                             break
-
                         previous_status = self.state.status
                     except ConnectionClosed:
                         break
         except Exception as e:
-            print(f"Error in game connection: {e}")
+            print(f"GameService connection error: {e}")
         finally:
             self.running = False
             self.websocket = None
-            self._loop = None
+            if self._loop:
+                self._loop.stop()

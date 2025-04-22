@@ -1,197 +1,195 @@
 import asyncio
 import logging
 from datetime import datetime
-from uuid import uuid4
 
 from fastapi import WebSocket
 from prisma.models import Match, MatchPlayer
 from prisma.types import MatchUpdateInput
 
-from core.models.game import BombState, GameState
+from core.models.game import BombState, GameState, GameStatus, PlayerState
 
 logger = logging.getLogger(__name__)
 
 
 class GameService:
-    """Gerencia jogos em memória e suas conexões WebSocket"""
+    """Manages in-memory games and WebSocket connections."""
 
     def __init__(self) -> None:
-        self._games: dict[str, GameState] = {}
-        self._connections: dict[str, list[WebSocket]] = {}
-        self._timers: dict[str, asyncio.Task] = {}
+        self.games: dict[str, GameState] = {}
+        self.connections: dict[str, list[WebSocket]] = {}
+        self.game_timers: dict[str, asyncio.Task] = {}
+        self.bomb_timers: dict[tuple[str, str], asyncio.Task] = {}
 
-    async def create_game(self, player_ids: list[str]) -> str:
-        """
-        Cria um novo jogo no banco de dados e em memória.
-
-        Args:
-            player_ids: Lista de IDs dos jogadores
-
-        Returns:
-            ID do jogo criado
-        """
-        db_match = await Match.prisma().create(
-            data={"players": {"create": [{"userId": player_id} for player_id in player_ids]}}
+    async def create_game(self, player_ids: list[str], timeout: int = 60) -> str:
+        match = await Match.prisma().create(
+            data={"players": {"create": [{"userId": pid} for pid in player_ids]}}
         )
-
-        game_id = db_match.id
+        game_id = match.id
 
         game = GameState(game_id=game_id)
-        game.add_players(player_ids)
+        positions = [(1, 1), (len(game.map[0]) - 2, len(game.map) - 2)]
+        for i, pid in enumerate(player_ids):
+            x, y = positions[i] if i < len(positions) else (0, 0)
+            game.players[pid] = PlayerState(
+                username=pid,
+                direction_state="stand_by",
+                x=x,
+                y=y,
+            )
 
-        self._games[game_id] = game
-        self._connections[game_id] = []
-
-        self._timers[game_id] = asyncio.create_task(self._end_game_after_timeout(game_id, 60))
-
-        logger.info(f"Game created with ID: {game_id}")
+        self.games[game_id] = game
+        self.connections[game_id] = []
+        self.game_timers[game_id] = asyncio.create_task(
+            self._end_game_after_timeout(game_id, timeout)
+        )
+        logger.info(f"Created game {game_id} with players {player_ids}")
         return game_id
 
     async def _end_game_after_timeout(self, game_id: str, seconds: int) -> None:
-        """
-        Encerra o jogo após o timeout especificado.
-
-        Args:
-            game_id: ID do jogo
-            seconds: Tempo em segundos para encerrar o jogo
-        """
         try:
             await asyncio.sleep(seconds)
-            if game_id in self._games:
-                logger.info(f"Game {game_id} timeout reached ({seconds}s). Ending as draw.")
-                # Atualiza o objeto de jogo para indicar fim de jogo (empate)
-                self._games[game_id].end_game(winner_id=None)
-                # Finaliza o jogo no banco de dados
-                await self._finalize_match(game_id, winner_id=None)
-                # Notifica todos os clientes
-                await self.broadcast_state(game_id)
-                # Não remove o jogo para permitir que clientes vejam o estado final
+            game = self.games.get(game_id)
+            if not game or game.status != GameStatus.PLAYING:
+                return
+            logger.info(f"Game {game_id} timeout; ending as draw")
+            game.end_game()
+            await self._finalize_match(game_id)
+            await self.broadcast_state(game_id)
         except asyncio.CancelledError:
-            logger.info(f"Timer for game {game_id} was cancelled")
+            logger.debug(f"Timeout for game {game_id} cancelled")
         except Exception as e:
-            logger.error(f"Error in game timeout handler: {e}")
+            logger.error(f"Error in timeout handler for game {game_id}: {e}")
 
     async def _finalize_match(self, game_id: str, winner_id: str | None = None) -> None:
-        """
-        Finaliza o jogo no banco de dados.
-
-        Args:
-            game_id: ID do jogo (que é o mesmo do Match no banco)
-            winner_id: ID do jogador vencedor, ou None se empate
-        """
-        # Atualiza o match no banco de dados (o game_id já é o ID do Match)
-        update_data: MatchUpdateInput = {
-            "endedAt": datetime.now(),
-        }
-
+        data: MatchUpdateInput = {"endedAt": datetime.now()}
         if winner_id:
-            update_data["winnerUserId"] = winner_id
-            await MatchPlayer.prisma().update_many(
-                where={"matchId": game_id, "userId": winner_id}, data={"isWinner": True}
-            )
+            data["winnerUserId"] = winner_id
+        try:
+            await Match.prisma().update(where={"id": game_id}, data=data)
+            if winner_id:
+                await MatchPlayer.prisma().update_many(
+                    where={"matchId": game_id, "userId": winner_id},
+                    data={"isWinner": True},
+                )
+            logger.info(f"Finalized match {game_id}; winner: {winner_id or 'draw'}")
+        except Exception as e:
+            logger.error(f"Failed to finalize match {game_id}: {e}")
 
-        await Match.prisma().update(where={"id": game_id}, data=update_data)
+    def add_connection(self, game_id: str, ws: WebSocket) -> None:
+        conns = self.connections.setdefault(game_id, [])
+        conns.append(ws)
+        logger.debug(f"Added connection to game {game_id}: {len(conns)} total")
 
-        logger.info(f"Match {game_id} finalized. Winner: {winner_id or 'Draw'}")
-
-    def get_game(self, game_id: str) -> GameState:
-        """Retorna o GameState existente ou levanta KeyError"""
-        return self._games[game_id]
-
-    def add_connection(self, game_id: str, websocket: WebSocket) -> None:
-        """Adiciona uma conexão WebSocket a um jogo"""
-        if game_id not in self._connections:
-            self._connections[game_id] = []
-        self._connections[game_id].append(websocket)
-        logger.info(
-            f"Added connection to game {game_id}, total connections: {len(self._connections[game_id])}"  # noqa: E501
-        )
-
-    def remove_connection(self, game_id: str, websocket: WebSocket) -> None:
-        """Remove uma conexão WebSocket de um jogo"""
-        if game_id in self._connections:
-            self._connections[game_id] = [
-                ws for ws in self._connections[game_id] if ws != websocket
-            ]
-            logger.info(
-                f"Removed connection from game {game_id}, remaining connections: {len(self._connections[game_id])}"  # noqa: E501
-            )
+    def remove_connection(self, game_id: str, ws: WebSocket) -> None:
+        conns = self.connections.get(game_id, [])
+        if ws in conns:
+            conns.remove(ws)
+            logger.debug(f"Removed connection from game {game_id}: {len(conns)} remaining")
 
     async def broadcast_state(self, game_id: str) -> None:
-        """Envia o estado atual do jogo para todos os jogadores conectados"""
-        if game_id not in self._games or game_id not in self._connections:
+        game = self.games.get(game_id)
+        conns = self.connections.get(game_id, [])
+        if not game or not conns:
             return
-
-        game = self._games[game_id]
         state = game.model_dump()
-        dead_connections = []
-
-        for websocket in self._connections[game_id]:
+        dead: list[WebSocket] = []
+        for ws in conns:
             try:
-                await websocket.send_json(state)
+                await ws.send_json(state)
             except Exception as e:
-                logger.error(f"Failed to send state update: {e}")
-                dead_connections.append(websocket)
-
-        # Remove conexões mortas
-        for websocket in dead_connections:
-            self.remove_connection(game_id, websocket)
+                logger.warning(f"Broadcast failed for {game_id}: {e}")
+                dead.append(ws)
+        for ws in dead:
+            self.remove_connection(game_id, ws)
 
     async def place_bomb(
-        self, game_id: str, owner_id: str, x: int, y: int, radius: int, time: float
+        self,
+        game_id: str,
+        owner_id: str,
+        x: int,
+        y: int,
     ) -> None:
-        game = self._games[game_id]
-        bomb_id = str(uuid4())
-        bomb = BombState(bomb_id=bomb_id, x=x, y=y, owner_id=owner_id, radius=radius)
-        game.add_bomb(bomb)
+        # TODO: define deplay and radius based on the active powerups.
+        radius = 1
+        delay = 2
+        game = self.games.get(game_id)
+        if not game or game.status != GameStatus.PLAYING:
+            return
 
-        logger.info(f"Game {game_id}: bomb placed {bomb_id} at ({x},{y})")
+        bomb = BombState(x=x, y=y)
+        game.players[owner_id].bombs.append(bomb)
+        logger.debug(f"Game {game_id}: bomb {bomb.id} placed by {owner_id}")
         await self.broadcast_state(game_id)
+        asyncio.create_task(self._increment_bombs_placed(game_id, owner_id))
+        task = asyncio.create_task(
+            self._handle_explosion(game_id, owner_id, bomb.id, x, y, radius, delay)
+        )
+        self.bomb_timers[(game_id, bomb.id)] = task
 
-        # incrementa contador de bombas no DB
+    async def _increment_bombs_placed(self, game_id: str, owner_id: str) -> None:
         try:
             await MatchPlayer.prisma().update_many(
                 where={"matchId": game_id, "userId": owner_id},
                 data={"bombsPlaced": {"increment": 1}},
             )
         except Exception as e:
-            logger.error(
-                f"Failed to update bombsPlaced for match {game_id}, user {owner_id}: {e!s}"
-            )
+            logger.error(f"Error updating bombsPlaced for {game_id}, user {owner_id}: {e}")
 
-        # programa explosão após 1s
-        async def _explode() -> None:
-            await asyncio.sleep(time)
-            game.explode_bomb(bomb_id)
-            explosion_state = game.add_explosion(bomb_id, x, y, radius)
-            await self.broadcast_state(game_id)
-
-            await asyncio.sleep(explosion_state.duration)
-
-            # 1) Detecta quem foi atingido
-            hit = []
-            for pid, p in game.players.items():
-                if (p.x == x and abs(p.y - y) <= radius) or (p.y == y and abs(p.x - x) <= radius):
-                    hit.append(pid)
-
-            if hit:
-                # Para 2 players, o vencedor é o outro
-                winner = next(pid for pid in game.players if pid not in hit)
-                game.end_game(winner_id=winner)
-                # 2) Grava no DB
-                await MatchPlayer.prisma().update_many(
-                    where={"matchId": game_id, "userId": winner}, data={"isWinner": True}
-                )
-                await self._finalize_match(game_id, winner)
-                # 3) Notifica fim
-                await self.broadcast_state(game_id)
+    async def _handle_explosion(
+        self,
+        game_id: str,
+        owner_id: str,
+        bomb_id: str,
+        x: int,
+        y: int,
+        radius: int,
+        delay: float,
+    ) -> None:
+        try:
+            await asyncio.sleep(delay)
+            game = self.games.get(game_id)
+            if not game:
                 return
-
-            game.clear_explosion(bomb_id)
+            # Mark explosion time
+            game.explode_bomb(owner_id, bomb_id)
             await self.broadcast_state(game_id)
 
-        self._timers[f"{game_id}_{bomb_id}"] = asyncio.create_task(_explode())
+            # Immediate hit detection
+            hits = [
+                pid
+                for pid, p in game.players.items()
+                if (p.x == x and abs(p.y - y) <= radius) or (p.y == y and abs(p.x - x) <= radius)
+            ]
+            if hits:
+                winners = [pid for pid in game.players if pid not in hits]
+                winner = winners[0] if winners else None
+                if winner:
+                    game.end_game(winner)
+                    asyncio.create_task(self._declare_winner(game_id, winner))
+                    await self.broadcast_state(game_id)
+                    return
+        except asyncio.CancelledError:
+            logger.debug(f"Explosion cancelled for bomb {bomb_id} in game {game_id}")
+        except Exception as e:
+            logger.error(f"Error during explosion for {bomb_id} in game {game_id}: {e}")
+
+    async def _declare_winner(self, game_id: str, winner_id: str) -> None:
+        try:
+            await MatchPlayer.prisma().update_many(
+                where={"matchId": game_id, "userId": winner_id},
+                data={"isWinner": True},
+            )
+            await self._finalize_match(game_id, winner_id)
+        except Exception as e:
+            logger.error(f"Failed to declare winner for game {game_id}: {e}")
+
+    def cancel_timers(self, game_id: str) -> None:
+        if task := self.game_timers.pop(game_id, None):
+            task.cancel()
+        to_cancel = [key for key in self.bomb_timers if key[0] == game_id]
+        for key in to_cancel:
+            if task := self.bomb_timers.pop(key, None):
+                task.cancel()
 
 
-# instância única para injeção
 game_service = GameService()

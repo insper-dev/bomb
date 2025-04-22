@@ -158,3 +158,8 @@ class Carlitos(Player):
         map: list[list[str]],
     ) -> None:
         super().__init__(screen, position, CARLITOS, game_service, margin, map)
+
+
+PLAYERS = {
+    "carlitos": Carlitos,
+}

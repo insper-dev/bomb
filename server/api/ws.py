@@ -8,7 +8,13 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from prisma.models import Match, User
 from prisma.partials import Opponent
 
-from core.models.ws import GameEvent, MatchMakingEvent
+from core.models.ws import (
+    GameEvent,
+    MatchMakingEvent,
+    MovimentEvent,
+    PlaceBombEvent,
+    WebSocketCloseCode,
+)
 from server.api.dependencies import auth_service
 from server.services.game import game_service
 
@@ -92,52 +98,50 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
 
 @router.websocket("/game/{game_id}")
 async def game_ws(websocket: WebSocket, game_id: str) -> None:
-    """WebSocket endpoint para o jogo."""
+    """WebSocket endpoint for real-time game play."""
+    # Authenticate via WS
     user = await auth_service.get_current_user_ws(websocket)
-
-    # aceita conexão
     await websocket.accept()
     if not user:
-        await websocket.close(code=1008)
+        await websocket.close(code=WebSocketCloseCode.UNAUTHORIZED)
         return
 
-    # busca jogo
-    try:
-        game = game_service.get_game(game_id)
-    except KeyError:
-        await websocket.close(code=1003)
+    game = game_service.games.get("game_id")
+    if game is None:
+        await websocket.close(code=WebSocketCloseCode.MATCH_FOUND)
         return
 
-    # adiciona conexão
+    # Register connection
     game_service.add_connection(game_id, websocket)
 
-    try:
-        # envia estado inicial para o novo jogador
-        await websocket.send_json(game.model_dump())
+    # Send initial state
+    await websocket.send_json(game.model_dump())
 
+    try:
         while True:
             raw = await websocket.receive_json()
             ev = GameEvent.validate_python(raw)
-            if ev.event == "move":
-                # move player
-                dx, dy = {
-                    "up": (0, -1),
-                    "down": (0, 1),
-                    "left": (-1, 0),
-                    "right": (1, 0),
-                    "stand_by": (0, 0),
-                }[ev.direction]
-                game = game_service.get_game(game_id)
+
+            if isinstance(ev, MovimentEvent):
+                # Movement event
+                dx, dy = MovimentEvent.dxdy(ev.direction)
                 game.move_player(user.id, dx, dy, ev.direction)
                 await game_service.broadcast_state(game_id)
-            elif ev.event == "place_bomb":
-                # coloca bomba e agenda explosão
-                await game_service.place_bomb(
-                    game_id, user.id, ev.x, ev.y, ev.radius, ev.explosion_time
-                )
+
+            elif isinstance(ev, PlaceBombEvent):
+                # Place bomb at x, y (server assigns timing)
+                await game_service.place_bomb(game_id, user.id, ev.x, ev.y)
+
+            else:
+                # Unknown event: ignore or log
+                continue
+
     except WebSocketDisconnect:
         game_service.remove_connection(game_id, websocket)
-        return
+    except Exception:
+        # Unexpected error: close connection
+        await websocket.close(code=WebSocketCloseCode.ERROR)
+        game_service.remove_connection(game_id, websocket)
 
 
 @router.websocket("/leaderboard")

@@ -1,265 +1,169 @@
-import json
-from copy import deepcopy
-from pathlib import Path
-
 import pygame
 
-from client.game.base_block import BaseBlock
-from client.game.bomb import Bomb
-from client.game.particles import Particles
-from client.game.players import Carlitos, Player
 from client.scenes.base import BaseScene, Scenes
 from client.services.game import GameService
-from core.constants import FLOORS, MODULE_SIZE, PURPLE
+from core.constants import BLOCKS, BOMB_COKING, CARLITOS, EXPLOSION_PARTICLES, MODULE_SIZE, PURPLE
 from core.models.game import GameState, GameStatus
+from core.types import PlayerDirectionState
 
 
 class GameScene(BaseScene):
-    """Scene to render and control the Bomberman game via WebSocket."""
+    """Minimal scene to render Bomberman using GameService and GameState."""
 
     def __init__(self, app) -> None:
         super().__init__(app)
-        self.game_service: GameService = app.game_service
-        self.game_id: str = app.matchmaking_service.match_id or ""
-        self.game_service.start(self.game_id)
+        # Services
+        self.gs: GameService = app.game_service
+        self.match_id: str = app.matchmaking_service.match_id or ""
+        # Start realtime connection
+        self.gs.start(self.match_id)
+        self.gs.register_game_ended_callback(self._on_game_end)
 
-        # Initiate Game Music
-        self.song = "client/assets/sounds/map1_song.mpeg"
-        pygame.mixer.music.load(self.song)
-        pygame.mixer.music.play(-1)
-        pygame.mixer.music.stop()
+        # Pygame setup
+        self.font = pygame.font.SysFont(None, 36)
+        self.end_text: pygame.Surface | None = None
+        self.end_timer = 0
+        self.end_delay = 3000  # ms before return to menu
 
-        # Register callback for game end
-        self.game_service.register_game_ended_callback(self._on_game_ended)
+        # Render state
+        self.state: GameState | None = None
+        self.margin = (0, 0)
 
-        # UI elements
-        self.font_large = pygame.font.SysFont(None, 48)
-        self.font_medium = pygame.font.SysFont(None, 36)
-        self.font_small = pygame.font.SysFont(None, 24)
+    def _on_game_end(self, status: GameStatus, winner: str | None) -> None:
+        # Prepare end game message and timer
+        if status == GameStatus.DRAW:
+            msg = "Draw!"
+        elif winner and winner == self.app.auth_service.current_user.id:
+            msg = "You Won!"
+        else:
+            msg = "You Lost!"
+        self.end_text = self.font.render(msg, True, (255, 255, 255))
+        self.end_timer = pygame.time.get_ticks()
 
-        # Auto-return to menu timer
-        self.return_to_menu_timer = None
-        self.return_countdown = 5  # seconds
-
-        # Initiate players objects
-        self.players: dict[str, Player] = {}
-        self.players_initialized = False
-
-        # Initiate bombs objects
-        self.bombs: dict[str, Bomb] = {}
-
-        # Initiate particles objects
-        self.particles: dict[str, Particles] = {}
-
-        # Initiate map
-        with open(Path("client/game/maps.json")) as map:
-            self.map = json.load(map)["map2"]
-        self._calc_margin()
-        self._initiate_map()
-
-        # Local init state
-        self.state: dict[str, int | float | tuple] = {"player_position": 0}
-
-    def _on_game_ended(self, status: GameStatus, winner_id: str | None) -> None:
-        """Called when the game ends"""
-        # Não chame game_service.stop() aqui - isso tentará parar a thread de dentro dela mesma
-        # Apenas definimos uma flag para fazer a transição na thread principal
-        self.should_transition_to_game_over = True
-
-    def _create_playes_objects(self, state: GameState) -> None:
-        for player_id, pstate in state.players.items():
-            self.players[player_id] = Carlitos(
-                self.app.screen,
-                (
-                    pstate.x,
-                    pstate.y,
-                ),
-                self.game_service,
-                self.margin,
-                self.map,
-            )
-
-    def _initiate_map(self) -> None:
-        self.blocks: list[list[BaseBlock | tuple[pygame.Surface, pygame.Rect]]] = [[]]
-        for y, linha in enumerate(self.map):
-            pre_list: list[BaseBlock | tuple[pygame.Surface, pygame.Rect]] = []
-            for x, name in enumerate(linha):
-                if name[0:2] != "f_":
-                    pre_list.append(
-                        BaseBlock(
-                            self.app.screen,
-                            name,
-                            (self.margin[0] + x * MODULE_SIZE, self.margin[1] + y * MODULE_SIZE),
-                        )
-                    )
-                else:
-                    surface = pygame.Surface((MODULE_SIZE, MODULE_SIZE))
-                    surface.fill(FLOORS[name])
-                    rect = surface.get_rect(
-                        topleft=(self.margin[0] + x * MODULE_SIZE, self.margin[1] + y * MODULE_SIZE)
-                    )
-                    pre_list.append((surface, rect))
-            self.blocks.append(pre_list)
-            pre_list = []
-
-    def _calc_margin(self) -> None:
-        self.margin: tuple[int, int] = (
-            int(self.app.screen_center[0] - (len(self.map[0]) * MODULE_SIZE) // 2),
-            int(self.app.screen_center[1] - (len(self.map) * MODULE_SIZE) // 2),
+    def _calc_margin(self, map_width: int, map_height: int) -> None:
+        screen_w, screen_h = self.app.screen.get_size()
+        total_w = map_width * MODULE_SIZE
+        total_h = map_height * MODULE_SIZE
+        self.margin = (
+            (screen_w - total_w) // 2,
+            (screen_h - total_h) // 2,
         )
 
-    def handle_event(self, event) -> None:
+    def handle_event(self, event: pygame.event.Event) -> None:
+        # Exit to menu
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+            self.gs.stop()
+            self.app.current_scene = Scenes.START
+            return
+        # Movement keys
         if event.type == pygame.KEYDOWN:
-            # Exit to menu
-            if event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE:
-                self.game_service.stop()
-                self.app.current_scene = Scenes.START
-
-        for pid, player in self.players.items():
-            user = self.app.auth_service.current_user
-            state = self.game_service.state
-            if state is not None:
-                for id, psta in state.players.items():
-                    if user is not None and user.id != pid and pid == id:
-                        player.moviment_state = psta.movement_state
-            if user is not None and user.id == pid:
-                player.handle_events(event)
-                if (
-                    event.type == pygame.KEYDOWN
-                    and event.key == pygame.K_SPACE
-                    and not self.game_service.is_game_ended
-                ):
-                    self.game_service.send_bomb()
+            key_map: dict[int, PlayerDirectionState] = {
+                pygame.K_UP: "up",
+                pygame.K_DOWN: "down",
+                pygame.K_LEFT: "left",
+                pygame.K_RIGHT: "right",
+            }
+            if event.key in key_map:
+                self.gs.send_move(key_map[event.key])
+            elif event.key == pygame.K_SPACE:
+                self.gs.send_bomb()
 
     def update(self) -> None:
-        # Primeiro verificamos se o jogo sinalizou que acabou e devemos transitar para o game over
-        if hasattr(self, "should_transition_to_game_over") and self.should_transition_to_game_over:
-            # Primeiro paramos o game service (na thread principal)
-            if self.game_service.running:
-                print("Stopping game service from main thread")
-                self.game_service.stop()
-            # Então mudamos para a cena de game over
-            self.app.current_scene = Scenes.GAME_OVER
-            return
-
-        # Processamento normal
+        # Update latest state
+        self.state = self.gs.state
+        # Check end delay
+        if self.end_text:
+            now = pygame.time.get_ticks()
+            if now - self.end_timer > self.end_delay:
+                self.app.current_scene = Scenes.GAME_OVER
         super().update()
 
     def render(self) -> None:
         screen = self.app.screen
         screen.fill(PURPLE)
-        state = self.game_service.state
-        if not state:
+        if not self.state:
             return
+        # Compute margin once
+        map_h = len(self.state.map)
+        map_w = len(self.state.map[0]) if map_h else 0
+        self._calc_margin(map_w, map_h)
+        mx, my = self.margin
 
-        # Draw grid
-        for y in range(len(self.map)):
-            for x in range(len(self.map[0])):
+        # Draw map tiles
+        for y, row in enumerate(self.state.map):
+            for x, cell in enumerate(row):
                 rect = pygame.Rect(
-                    self.margin[0] + x * MODULE_SIZE,
-                    self.margin[1] + y * MODULE_SIZE,
+                    mx + x * MODULE_SIZE,
+                    my + y * MODULE_SIZE,
                     MODULE_SIZE,
                     MODULE_SIZE,
                 )
-                pygame.draw.rect(screen, (50, 50, 50), rect, width=1)
+                block = BLOCKS[cell]
+                screen.blit(block, rect)
 
-        # Draw map objects
-        for list in self.blocks:
-            for object in list:
-                if isinstance(object, BaseBlock):
-                    object.render()
-                else:
-                    surface, rect = object
-                    self.app.screen.blit(surface, rect)
+        # Draw grid lines
+        for y in range(map_h + 1):
+            pygame.draw.line(
+                screen,
+                (255, 255, 255),
+                (mx, my + y * MODULE_SIZE),
+                (mx + map_w * MODULE_SIZE, my + y * MODULE_SIZE),
+            )
+        for x in range(map_w + 1):
+            pygame.draw.line(
+                screen,
+                (255, 255, 255),
+                (mx + x * MODULE_SIZE, my),
+                (mx + x * MODULE_SIZE, my + map_h * MODULE_SIZE),
+            )
 
         # Draw players
+        for pstate in self.state.players.values():
+            x = mx + pstate.x * MODULE_SIZE
+            y = my + pstate.y * MODULE_SIZE
+            player_rect = pygame.Rect(x, y, MODULE_SIZE, MODULE_SIZE)
 
-        if not self.players_initialized:
-            self._create_playes_objects(state)
-            self.players_initialized = True
+            # Choose the correct player sprite based on direction
+            player_images = CARLITOS
+            direction = pstate.direction_state or "stand_by"
+            # Use animation frame based on player position to simulate movement
+            frame_idx = int(pstate.x + pstate.y) % len(player_images[direction])
+            player_sprite = player_images[direction][frame_idx]
 
-        for player_id, player_state in state.players.items():
-            for id, player in self.players.items():
-                if id == player_id:
-                    if player.moviment_state == "stand_by":
-                        x = player_state.x
-                        y = player_state.y
-                        if player.last_position != (x, y):
-                            player.relative_position = (x, y)
-        for player in self.players.values():
-            player.render()
+            # Draw the player
+            screen.blit(player_sprite, player_rect)
 
         # Draw bombs
+        for pstate in self.state.players.values():
+            for bomb in pstate.bombs:
+                bomb_rect = pygame.Rect(
+                    mx + bomb.x * MODULE_SIZE, my + bomb.y * MODULE_SIZE, MODULE_SIZE, MODULE_SIZE
+                )
 
-        for bomb in state.bombs:
-            if bomb.bomb_id not in self.bombs:
-                x = bomb.x
-                y = bomb.y
-                self.bombs[bomb.bomb_id] = Bomb(self.app.screen, (x, y), self.margin)
+                # Pick bomb sprite based on time (animation)
+                if bomb.exploded_at:
+                    # If bomb exploded, draw explosion particles
+                    core_rect = bomb_rect.copy()
+                    screen.blit(EXPLOSION_PARTICLES["geo"][0], core_rect)
 
-        for bomb in self.bombs.values():
-            bomb.render()
-
-        # Draw explosions as a "+" cross
-
-        ini_map = deepcopy(self.map)
-
-        for exp in state.explosions:
-            x = exp.x
-            y = exp.y
-            position = (x, y)
-            to_remove = []
-            for id in self.bombs:
-                if exp.bomb_id == id:
-                    to_remove.append(id)
-                    if id not in self.particles:
-                        self.particles[id] = Particles(
-                            self.app.screen,
-                            position,
-                            self.margin,
-                            exp.radius,
-                            self.map,
+                    # Draw explosion in four directions
+                    for i, direction in enumerate([(0, -1), (1, 0), (0, 1), (-1, 0)]):
+                        dx, dy = direction
+                        exp_rect = pygame.Rect(
+                            mx + (bomb.x + dx) * MODULE_SIZE,
+                            my + (bomb.y + dy) * MODULE_SIZE,
+                            MODULE_SIZE,
+                            MODULE_SIZE,
                         )
-            for item in to_remove:
-                del self.bombs[item]
+                        screen.blit(EXPLOSION_PARTICLES["tip"][i], exp_rect)
+                else:
+                    # Bomb cooking animation
+                    frame_idx = (pygame.time.get_ticks() // 200) % len(BOMB_COKING)
+                    bomb_sprite = BOMB_COKING[frame_idx]
+                    screen.blit(bomb_sprite, bomb_rect)
 
-        to_remove = []
-        for id, particle in self.particles.items():
-            particle.render()
-            if particle.is_done:
-                to_remove.append(id)
-
-        for item in to_remove:
-            del self.particles[item]
-
-        for l1, l2 in zip(ini_map, self.map, strict=False):
-            for i1, i2 in zip(l1, l2, strict=False):
-                if i1 != i2:
-                    self._initiate_map()
-                    break
-
-        if self.game_service.is_game_ended:
-            result_text = self.game_service.game_result
-            text = self.font_large.render(result_text, True, (255, 255, 255))
-            rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() - 80))
-            screen.blit(text, rect)
-
-            if self.return_to_menu_timer:
-                remaining = max(0, (self.return_to_menu_timer - pygame.time.get_ticks()) // 1000)
-                countdown = self.font_medium.render(
-                    f"Returning to menu in {remaining} seconds...", True, (200, 200, 200)
-                )
-                screen.blit(
-                    countdown,
-                    (
-                        screen.get_width() // 2 - countdown.get_width() // 2,
-                        screen.get_height() - 40,
-                    ),
-                )
-        else:
-            # Regular game instructions
-            instr = self.font_small.render("Use arrow keys to move", True, (180, 180, 180))
-            screen.blit(instr, (self.margin[0], screen.get_height() - 80))
-
-            instr2 = self.font_small.render("Press ESC to return to menu", True, (180, 180, 180))
-            screen.blit(instr2, (self.margin[1], screen.get_height() - 50))
+        # Draw end text if any
+        if self.end_text:
+            tx, ty = self.end_text.get_size()
+            sx, sy = screen.get_size()
+            screen.blit(self.end_text, ((sx - tx) // 2, (sy - ty) // 2))

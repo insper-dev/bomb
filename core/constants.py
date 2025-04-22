@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pygame
 
+from core.models.game import MapBlockType
 from core.types import (
     ComponentSize,
     ComponentType,
@@ -190,26 +191,20 @@ BLOCKS_PATH = IMAGES_PATH / "blocks"
 
 DESTROYABLE_BLOCKS: list[str] = ["caixa", "areia"]
 
-BLCOKS: dict[str, pygame.Surface] = {
-    "areia": pygame.transform.scale(
+BLOCKS: dict[MapBlockType, pygame.Surface] = {
+    MapBlockType.SAND_BOX: pygame.transform.scale(
         pygame.image.load(BLOCKS_PATH / "Areia.png"), (MODULE_SIZE, MODULE_SIZE)
     ),
-    "caixa": pygame.transform.scale(
+    MapBlockType.WOODEN_BOX: pygame.transform.scale(
         pygame.image.load(BLOCKS_PATH / "Caixa.png"), (MODULE_SIZE, MODULE_SIZE)
     ),
-    "diamante": pygame.transform.scale(
+    MapBlockType.DIAMOND_BOX: pygame.transform.scale(
         pygame.image.load(BLOCKS_PATH / "Diamante.png"), (MODULE_SIZE, MODULE_SIZE)
     ),
-    "metal": pygame.transform.scale(
+    MapBlockType.METAL_BOX: pygame.transform.scale(
         pygame.image.load(BLOCKS_PATH / "Metal.png"), (MODULE_SIZE, MODULE_SIZE)
     ),
-}
-
-FLOORS: dict[str, pygame.Color] = {
-    "f_shed1": pygame.Color(23, 23, 23),
-    "f_shed2": pygame.Color(5, 5, 5),
-    "f_desert1": pygame.Color(239, 191, 143),
-    "f_desert2": pygame.Color(168, 113, 59),
+    MapBlockType.EMPTY: pygame.Surface((MODULE_SIZE, MODULE_SIZE), pygame.SRCALPHA),
 }
 
 # Bomb
