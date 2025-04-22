@@ -1,11 +1,10 @@
-from turtle import position
 from typing import Literal
 
 import pygame
 
 from client.services.game import GameService
-from core.constants import CARLITOS, MODULE_SIZE
-from core.types import PlayerDirectionState
+from core.constants import BLCOKS, CARLITOS, MODULE_SIZE
+from core.types import Coordinate, PlayerDirectionState
 
 
 class Player:
@@ -15,10 +14,16 @@ class Player:
         position: tuple[int, int],
         images: dict[PlayerDirectionState, list[pygame.Surface]],
         game_service: GameService,
-        map: dict | None = None,
+        margin: tuple[int, int],
+        map: list[list[str]],
     ) -> None:
         self.screen = screen
-        self.position = position
+        self.margin = margin
+        self.relative_position = position
+        self.position: tuple[float, float] = (
+            self.relative_position[0] * MODULE_SIZE + self.margin[0],
+            self.relative_position[1] * MODULE_SIZE + self.margin[1],
+        )
         self.last_position = position
         self.game_service = game_service
         self.map = map
@@ -36,8 +41,8 @@ class Player:
 
     def render(self) -> None:
         self._update_timer()
-        self._handle_animation()
         self._move()
+        self._handle_animation()
 
     def handle_events(self, event: pygame.event.Event) -> None:
         self._change_moviment_state(event)
@@ -56,9 +61,15 @@ class Player:
         self.time["initial_time"] = current_time
         self.time["time_counter"] += self.time["time_elapsed"]
 
+    def _update_position(self) -> None:
+        x = self.relative_position[0] * MODULE_SIZE + self.margin[0]
+        y = self.relative_position[1] * MODULE_SIZE + self.margin[1]
+        self.position = (x, y)
+
     def _move(self) -> None:
         direction = self.moviment_state
         if direction == "stand_by":
+            self._update_position()
             return
         dt = self.time["time_elapsed"] / 1000
         pos = self.position
@@ -98,9 +109,28 @@ class Player:
         }
         if event.type == pygame.KEYDOWN and event.key in movements:
             key = movements[event.key]
-            self.moviment_state = key
-            self.last_position = position
-            self.game_service.send_move(key)
+        else:
+            return
+        pos = self.relative_position
+
+        around: dict[PlayerDirectionState, Coordinate] = {
+            "up": (pos[0], pos[1] - 1),
+            "right": (pos[0] + 1, pos[1]),
+            "down": (pos[0], pos[1] + 1),
+            "left": (pos[0] - 1, pos[1]),
+        }
+        x, y = around[key]
+        print(x, y)
+        if y >= len(self.map) or x >= len(self.map[0]) or y < 0 or x < 0:
+            print((x, y))
+            return
+        if self.map[y][x] in BLCOKS.keys():
+            print(self.map[y][x])
+            return
+
+        self.moviment_state = key
+        self.last_position = self.relative_position
+        self.game_service.send_move(key)
 
     def __draw(self, image: pygame.Surface) -> None:
         rect = image.get_rect(topleft=self.position)
@@ -114,6 +144,7 @@ class Carlitos(Player):
         screen: pygame.Surface,
         position: tuple[int, int],
         game_service: GameService,
-        map: dict | None = None,
+        margin: tuple[int, int],
+        map: list[list[str]],
     ) -> None:
-        super().__init__(screen, position, CARLITOS, game_service, map)
+        super().__init__(screen, position, CARLITOS, game_service, margin, map)

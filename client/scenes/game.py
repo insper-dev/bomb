@@ -73,10 +73,12 @@ class GameScene(BaseScene):
             self.players[player_id] = Carlitos(
                 self.app.screen,
                 (
-                    pstate.x * MODULE_SIZE + self.margin[0],
-                    pstate.y * MODULE_SIZE + self.margin[1],
+                    pstate.x,
+                    pstate.y,
                 ),
                 self.game_service,
+                self.margin,
+                self.map,
             )
 
     def _initiate_map(self) -> None:
@@ -181,10 +183,10 @@ class GameScene(BaseScene):
             for id, player in self.players.items():
                 if id == player_id:
                     if player.moviment_state == "stand_by":
-                        x = player_state.x * MODULE_SIZE + self.margin[0]
-                        y = player_state.y * MODULE_SIZE + self.margin[1]
+                        x = player_state.x
+                        y = player_state.y
                         if player.last_position != (x, y):
-                            player.position = (x, y)
+                            player.relative_position = (x, y)
         for player in self.players.values():
             player.render()
 
