@@ -159,7 +159,7 @@ class GameService:
                 f"Failed to update bombsPlaced for match {game_id}, user {owner_id}: {e!s}"
             )
 
-        # programa explosão após 3s
+        # programa explosão após 1s
         async def _explode() -> None:
             await asyncio.sleep(time)
             game.explode_bomb(bomb_id)

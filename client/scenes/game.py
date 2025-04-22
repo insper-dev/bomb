@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from pathlib import Path
 
 import pygame
@@ -128,9 +129,7 @@ class GameScene(BaseScene):
                     and event.key == pygame.K_SPACE
                     and not self.game_service.is_game_ended
                 ):
-                    self.game_service.send_bomb(
-                        explosion_radius=player.status["power"], explosion_time=1
-                    )
+                    self.game_service.send_bomb()
 
     def update(self) -> None:
         # Primeiro verificamos se o jogo sinalizou que acabou e devemos transitar para o game over
@@ -202,9 +201,12 @@ class GameScene(BaseScene):
             bomb.render()
 
         # Draw explosions as a "+" cross
+
+        ini_map = deepcopy(self.map)
+
         for exp in state.explosions:
-            x = self.margin[0] + exp.x * MODULE_SIZE
-            y = self.margin[1] + exp.y * MODULE_SIZE
+            x = exp.x
+            y = exp.y
             position = (x, y)
             to_remove = []
             for id in self.bombs:
@@ -212,19 +214,29 @@ class GameScene(BaseScene):
                     to_remove.append(id)
                     if id not in self.particles:
                         self.particles[id] = Particles(
-                            self.app.screen, self.particles, position, exp.radius
+                            self.app.screen,
+                            position,
+                            self.margin,
+                            exp.radius,
+                            self.map,
                         )
             for item in to_remove:
                 del self.bombs[item]
 
         to_remove = []
-        for particle in self.particles.values():
-            yup = particle.render()
-            if yup != "":
-                to_remove.append(yup)
+        for id, particle in self.particles.items():
+            particle.render()
+            if particle.is_done:
+                to_remove.append(id)
 
         for item in to_remove:
             del self.particles[item]
+
+        for l1, l2 in zip(ini_map, self.map, strict=False):
+            for i1, i2 in zip(l1, l2, strict=False):
+                if i1 != i2:
+                    self._initiate_map()
+                    break
 
         if self.game_service.is_game_ended:
             result_text = self.game_service.game_result
