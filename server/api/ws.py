@@ -106,7 +106,7 @@ async def game_ws(websocket: WebSocket, game_id: str) -> None:
         await websocket.close(code=WebSocketCloseCode.UNAUTHORIZED)
         return
 
-    game = game_service.games.get("game_id")
+    game = game_service.games.get(game_id)
     if game is None:
         await websocket.close(code=WebSocketCloseCode.MATCH_FOUND)
         return
