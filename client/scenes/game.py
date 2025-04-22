@@ -109,9 +109,7 @@ class GameScene(BaseScene):
         )
 
     def handle_event(self, event) -> None:
-        if event.type == pygame.QUIT:
-            self.app.running = False
-        elif event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN:
             # Exit to menu
             if event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE:
                 self.game_service.stop()

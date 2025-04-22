@@ -22,9 +22,7 @@ class GameOverScene(BaseScene):
             self.game_over_service.fetch_stats(self.match_id)
 
     def handle_event(self, event) -> None:
-        if event.type == pygame.QUIT:
-            self.app.running = False
-        elif event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RETURN:
                 # Play again (return to matchmaking)
                 self.app.current_scene = Scenes.MATCHMAKING

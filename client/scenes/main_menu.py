@@ -56,7 +56,7 @@ class MainMenuScene(BaseScene):
                 label="Sair",
                 variant="outline",
                 size="lg",
-                callback=lambda: pygame.quit(),
+                callback=lambda: setattr(self.app, "running", False),
             ),
             State(
                 self.app.screen,
