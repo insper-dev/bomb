@@ -20,9 +20,8 @@ class Input(BaseComponent):
         super().__init__(
             window, position, label, variant, size, text_type, hover, is_topleft, callback=callback
         )
-        self.value: str = ""
         self.ini_label = "" if r"\h" == self.label[-2:] else self.label[:-2]
-        self.secretive = self.label[:-2].lower() == "password"
+        self.secretive: bool = self.label[:-2].lower() == "password"
         self.active: bool = False
         self.time = {"elapsed_time": 0, "last_tick": pygame.time.get_ticks(), "time_counter": 0}
         self.animation_particle = "|"

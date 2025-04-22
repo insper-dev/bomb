@@ -21,6 +21,15 @@ class BaseComponent(ABC):
     Abstract base class for all components.
     """
 
+    label: str
+    is_focused: bool = False
+    is_disabled: bool = False
+    active: bool = False
+    value: str = ""
+    variant: ComponentVariant
+    size: ComponentSize
+    text_type: FontSize
+
     def __init__(
         self,
         window: pygame.Surface,
@@ -47,14 +56,12 @@ class BaseComponent(ABC):
         self.label = label
         self.window = window
         self.position = position
-        self.variant: ComponentVariant = variant
-        self.size: ComponentSize = size
-        self.text_type: FontSize = text_type
+        self.variant = variant
+        self.size = size
+        self.text_type = text_type
         self.hover = hover
         self.callback = callback
         self.is_topleft = is_topleft
-        self.is_focused = False
-        self.is_disabled = False
         # ! Warning: ter cuidado com a poha do nome da classe!!!
         # ! Se por acaso mudar o nome da classe, precisa mudar o "ComponentType"
         self.type: ComponentType = self.__class__.__name__.lower()  # type: ignore
