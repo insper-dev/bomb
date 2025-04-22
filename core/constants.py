@@ -240,14 +240,14 @@ PARTICLES_PATH = IMAGES_PATH / "particles"
 EXPLOSION_PARTICLES: dict[ParticleType, list[pygame.Surface]] = {
     "geo": [
         pygame.transform.scale(
-            pygame.image.load(PARTICLES_PATH / "particles_geo.jpeg"),
+            pygame.image.load(PARTICLES_PATH / "core.png"),
             (MODULE_SIZE, MODULE_SIZE),
         )
     ],
     "tip": [
         pygame.transform.rotate(
             pygame.transform.scale(
-                pygame.image.load(PARTICLES_PATH / "particles_tip.jpeg"),
+                pygame.image.load(PARTICLES_PATH / "tip.png"),
                 (MODULE_SIZE, MODULE_SIZE),
             ),
             angle,
@@ -257,7 +257,7 @@ EXPLOSION_PARTICLES: dict[ParticleType, list[pygame.Surface]] = {
     "tail": [
         pygame.transform.rotate(
             pygame.transform.scale(
-                pygame.image.load(PARTICLES_PATH / "particles_tail.jpeg"),
+                pygame.image.load(PARTICLES_PATH / "tail.png"),
                 (MODULE_SIZE, MODULE_SIZE),
             ),
             angle,
@@ -272,22 +272,22 @@ CARLITOS_PATH = IMAGES_PATH / "carlitos_player"
 CARLITOS: dict[PlayerDirectionState, list[pygame.Surface]] = {
     "right": [
         pygame.transform.scale(
-            pygame.image.load(CARLITOS_PATH / "horizontal_1.jpeg"),
+            pygame.image.load(CARLITOS_PATH / "horizontal_1.png"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
         pygame.transform.scale(
-            pygame.image.load(CARLITOS_PATH / "horizontal_2.jpeg"),
+            pygame.image.load(CARLITOS_PATH / "horizontal_2.png"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
         pygame.transform.scale(
-            pygame.image.load(CARLITOS_PATH / "horizontal_3.jpeg"),
+            pygame.image.load(CARLITOS_PATH / "horizontal_3.png"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
     ],
     "left": [
         pygame.transform.flip(
             pygame.transform.scale(
-                pygame.image.load(CARLITOS_PATH / "horizontal_1.jpeg"),
+                pygame.image.load(CARLITOS_PATH / "horizontal_1.png"),
                 (MODULE_SIZE, MODULE_SIZE),
             ),
             True,
@@ -295,7 +295,7 @@ CARLITOS: dict[PlayerDirectionState, list[pygame.Surface]] = {
         ),
         pygame.transform.flip(
             pygame.transform.scale(
-                pygame.image.load(CARLITOS_PATH / "horizontal_2.jpeg"),
+                pygame.image.load(CARLITOS_PATH / "horizontal_2.png"),
                 (MODULE_SIZE, MODULE_SIZE),
             ),
             True,
@@ -303,7 +303,7 @@ CARLITOS: dict[PlayerDirectionState, list[pygame.Surface]] = {
         ),
         pygame.transform.flip(
             pygame.transform.scale(
-                pygame.image.load(CARLITOS_PATH / "horizontal_3.jpeg"),
+                pygame.image.load(CARLITOS_PATH / "horizontal_3.png"),
                 (MODULE_SIZE, MODULE_SIZE),
             ),
             True,
@@ -312,35 +312,35 @@ CARLITOS: dict[PlayerDirectionState, list[pygame.Surface]] = {
     ],
     "down": [
         pygame.transform.scale(
-            pygame.image.load(CARLITOS_PATH / "front_1.jpeg"),
+            pygame.image.load(CARLITOS_PATH / "front_1.png"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
         pygame.transform.scale(
-            pygame.image.load(CARLITOS_PATH / "front_2.jpeg"),
+            pygame.image.load(CARLITOS_PATH / "front_2.png"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
         pygame.transform.scale(
-            pygame.image.load(CARLITOS_PATH / "front_3.jpeg"),
+            pygame.image.load(CARLITOS_PATH / "front_3.png"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
     ],
     "up": [
         pygame.transform.scale(
-            pygame.image.load(CARLITOS_PATH / "back_1.jpeg"),
+            pygame.image.load(CARLITOS_PATH / "back_1.png"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
         pygame.transform.scale(
-            pygame.image.load(CARLITOS_PATH / "back_2.jpeg"),
+            pygame.image.load(CARLITOS_PATH / "back_2.png"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
         pygame.transform.scale(
-            pygame.image.load(CARLITOS_PATH / "back_3.jpeg"),
+            pygame.image.load(CARLITOS_PATH / "back_3.png"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
     ],
     "stand_by": [
         pygame.transform.scale(
-            pygame.image.load(CARLITOS_PATH / "horizontal_2.jpeg"),
+            pygame.image.load(CARLITOS_PATH / "horizontal_2.png"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
     ],
