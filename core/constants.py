@@ -16,9 +16,12 @@ from core.types import (
     Thickness,
 )
 
-pygame.init()
-
 ROOT = Path(__file__).parent.parent
+
+CLIENT_TITLE = "Bomberman"
+CLIENT_WIDTH = 1200
+CLIENT_HEIGHT = 800
+CLIENT_FPS = 60
 
 ASSETS_PATH = ROOT / "client" / "assets"
 IMAGES_PATH = ASSETS_PATH / "images"
@@ -179,8 +182,6 @@ FONT_SIZE_MAP: dict[IsFocused, dict[FontSize, dict[ComponentSize, int]]] = {
     },
 }
 
-# Game constants
-GAME_ALPHABET_KEYS = [pygame.key.key_code(key) for key in "abcdefghijklmnopqrstuvwxyz"]
 
 MODULE_SIZE = 64
 

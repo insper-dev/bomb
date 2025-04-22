@@ -12,11 +12,6 @@ class Settings(BaseSettings):
     server_endpoint: str = "lara-bomb-api.insper.dev"
     server_endpoint_ssl: bool = True
 
-    client_title: str = "Lara Bomb"
-    client_width: int = 1280  # 800 or 1280
-    client_height: int = 800  # 600 or 080
-    client_fps: int = 60
-
     class Config:
         env_file = ".env"
         extra = "ignore"

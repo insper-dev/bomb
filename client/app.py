@@ -9,6 +9,7 @@ from client.scenes import SCENES_MAP, Scenes
 from client.services import AuthService, GameService, MatchmakingService
 from core.abstract import App
 from core.config import Settings
+from core.constants import CLIENT_FPS, CLIENT_HEIGHT, CLIENT_TITLE, CLIENT_WIDTH
 
 
 class ClientApp(App):
@@ -40,10 +41,8 @@ class ClientApp(App):
     def run(self) -> None:
         pygame.init()
 
-        pygame.display.set_caption(self.settings.client_title)
-        self.screen = pygame.display.set_mode(
-            [self.settings.client_width, self.settings.client_height]
-        )
+        pygame.display.set_caption(CLIENT_TITLE)
+        self.screen = pygame.display.set_mode([CLIENT_WIDTH, CLIENT_HEIGHT])
 
         self.clock = pygame.time.Clock()
         self.running = True
@@ -51,7 +50,7 @@ class ClientApp(App):
         past_scene = self.current_scene
         scene = SCENES_MAP[self.current_scene](self)
         while self.running:
-            self.clock.tick(self.settings.client_fps)
+            self.clock.tick(CLIENT_FPS)
 
             if self.current_scene != past_scene:
                 past_scene = self.current_scene
