@@ -206,7 +206,9 @@ BLCOKS: dict[str, pygame.Surface] = {
 
 FLOORS: dict[str, pygame.Color] = {
     "f_shed1": pygame.Color(23, 23, 23),
-    "f_sehd2": pygame.Color(5, 5, 5),
+    "f_shed2": pygame.Color(5, 5, 5),
+    "f_desert1": pygame.Color(239, 191, 143),
+    "f_desert2": pygame.Color(168, 113, 59),
 }
 
 # Bomb
@@ -343,5 +345,36 @@ CARLITOS: dict[PlayerDirectionState, list[pygame.Surface]] = {
             pygame.image.load(CARLITOS_PATH / "horizontal_2.png"),
             (MODULE_SIZE, MODULE_SIZE),
         ),
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(CARLITOS_PATH / "horizontal_2.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+        pygame.transform.scale(
+            pygame.image.load(CARLITOS_PATH / "front_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(CARLITOS_PATH / "back_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
     ],
 }
+
+
+class TimeManagement:
+    def __init__(self, clock_time: int) -> None:
+        self.last_updated = 0
+        self.elapsed_time = 0
+        self.time_counter = 0
+        self.clock_time = clock_time
+
+    def load(self) -> bool:
+        self.elapsed_time = pygame.time.get_ticks() - self.last_updated
+        self.last_updated = pygame.time.get_ticks()
+        if self.elapsed_time >= self.clock_time:
+            return True
+        return False

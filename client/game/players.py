@@ -31,6 +31,7 @@ class Player:
         self.sprites_index: int = 0
         self.velocity: int = 200
         self.ds = 0
+        self.stand_by_image = self.sprites["stand_by"][0]
         self.moviment_state: PlayerDirectionState = "stand_by"
         self.status: dict[Literal["vidas", "power", "active_power_up"], int | None] = {
             "vidas": 10,
@@ -95,8 +96,12 @@ class Player:
         if self.time["time_counter"] > self.movement_time:
             self.movement_time = 0
             self.sprites_index = (self.sprites_index + 1) % sprites_quantity
-            self.__draw(sprites[self.sprites_index])
             self.time["time_counter"] = 0
+
+        if self.moviment_state == "stand_by":
+            self.__draw(self.stand_by_image)
+            return
+        self.__draw(sprites[self.sprites_index])
 
     def _change_moviment_state(self, event: pygame.event.Event) -> None:
         if self.moviment_state != "stand_by":
@@ -125,6 +130,14 @@ class Player:
         if self.map[y][x] in BLCOKS.keys():
             return
 
+        stand_by_images = self.sprites["stand_by"]
+        stand_by: dict[PlayerDirectionState, pygame.Surface] = {
+            "right": stand_by_images[0],
+            "left": stand_by_images[1],
+            "down": stand_by_images[2],
+            "up": stand_by_images[3],
+        }
+        self.stand_by_image = stand_by[key]
         self.moviment_state = key
         self.last_position = self.relative_position
         self.game_service.send_move(key)
