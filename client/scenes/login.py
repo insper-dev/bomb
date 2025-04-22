@@ -1,6 +1,6 @@
 import pygame
 
-from client.components import BaseComponent, Button, Input, State, Text
+from client.components import Button, Input, State, Text
 from client.scenes.base import BaseScene, Scenes
 from core.constants import BLACK
 
@@ -16,9 +16,8 @@ class LoginScene(BaseScene):
         # State
         self.active_field = "username"  # Current input field: username or password
         self.is_signup_mode = False  # Toggle between login and signup
-        self.show_error = False
         self.error_message = ""
-        self.interative_components: list[BaseComponent] = [
+        self.inputs = [
             Input(
                 self.app.screen,
                 position=(
@@ -41,17 +40,9 @@ class LoginScene(BaseScene):
                 is_topleft=True,
                 callback=lambda: self._submit(),
             ),
-            State(
-                self.app.screen,
-                position=(
-                    int(self.app.screen_center[0] * 0.5),
-                    int(self.app.screen_center[1] * 1.45),
-                ),
-                label="Submit",
-                text_type="standard",
-                is_topleft=True,
-                callback=lambda: self._submit(),
-            ),
+        ]
+
+        self.buttons = [
             Button(
                 self.app.screen,
                 position=(
@@ -63,7 +54,7 @@ class LoginScene(BaseScene):
                 variant="outline",
                 size="sm",
                 is_topleft=True,
-                callback=lambda: self.change_scene(Scenes.MAIN_MENU),
+                callback=lambda: setattr(self.app, "current_scene", Scenes.MAIN_MENU),
             ),
             Button(
                 self.app.screen,
@@ -71,7 +62,7 @@ class LoginScene(BaseScene):
                     int(self.app.screen_center[0] * 1.62),
                     int(self.app.screen_center[1] * 1.85),
                 ),
-                label="Sing-in",
+                label="Cadastrar Conta",
                 text_type="standard",
                 variant="outline",
                 size="sm",
@@ -79,7 +70,20 @@ class LoginScene(BaseScene):
                 callback=lambda: self.authentication_change(),
             ),
         ]
-        self.non_interative: list[BaseComponent] = [
+
+        self.loading_state = State(
+            self.app.screen,
+            position=(
+                int(self.app.screen_center[0] * 0.5),
+                int(self.app.screen_center[1] * 1.45),
+            ),
+            label="Enviar",
+            text_type="standard",
+            is_topleft=True,
+            callback=lambda: self._submit(),
+        )
+
+        self.texts = [
             Text(
                 self.app.screen,
                 position=(self.app.screen_center[0], int(self.app.screen_center[1] * 0.35)),
@@ -93,7 +97,7 @@ class LoginScene(BaseScene):
                     int(self.app.screen_center[0] * 0.5),
                     int(self.app.screen_center[1] * 0.65),
                 ),
-                label="Username",
+                label="Usuário",
                 text_type="subtitle",
                 hover=False,
                 is_topleft=True,
@@ -104,7 +108,7 @@ class LoginScene(BaseScene):
                     int(self.app.screen_center[0] * 0.5),
                     int(self.app.screen_center[1] * 1.05),
                 ),
-                label="Password",
+                label="Senha",
                 text_type="subtitle",
                 hover=False,
                 is_topleft=True,
@@ -117,21 +121,16 @@ class LoginScene(BaseScene):
                 hover=False,
             ),
         ]
-        self.components: list[BaseComponent] = self.interative_components + self.non_interative
-        self.buttons_index = 0
+
+        self.components = [*self.inputs, *self.buttons, *self.texts, self.loading_state]
 
         # Setup auth callbacks
         self.app.auth_service.register_login_success_callback(self._on_login_success)
         self.app.auth_service.register_login_error_callback(self._on_login_error)
 
     def handle_event(self, event) -> None:
-        if event.type == pygame.QUIT:
-            self.app.running = False
-
-        elif event.type == pygame.KEYDOWN:
-            inputs: list[Input] = [self.interative_components[0], self.interative_components[1]]
-            buttons: list[Button] = [self.interative_components[3], self.interative_components[4]]
-            keys: dict[pygame.event.EventType, str] = {
+        if event.type == pygame.KEYDOWN:
+            keys = {
                 pygame.K_LEFT: "left",
                 pygame.K_RIGHT: "right",
                 pygame.K_TAB: "tab",
@@ -140,74 +139,60 @@ class LoginScene(BaseScene):
                 for component in self.components:
                     if isinstance(component, Input) and keys[event.key] != "tab":
                         component.active = False
-                        component.is_focused = False
-                    else:
-                        component.is_focused = False
-                if inputs[0].active or inputs[1].active:
-                    inputs[0].active = not inputs[0].active
-                    inputs[1].active = not inputs[1].active
+                    component.is_focused = False
+                if self.inputs[0].active or self.inputs[1].active:
+                    self.inputs[0].active = not self.inputs[0].active
+                    self.inputs[1].active = not self.inputs[1].active
                 elif keys[event.key] == "tab":
-                    inputs[0].active = not inputs[0].active
+                    self.inputs[0].active = not self.inputs[0].active
                 else:
                     index = 1 if keys[event.key] == "right" else 0
-                    buttons[index].is_focused = True
+                    self.buttons[index].is_focused = True
 
     def render(self) -> None:
         # Background
         self.app.screen.fill(BLACK)
 
-        # Loading indicator
-        is_loading = (
+        self.loading_state.active = (
             self.app.auth_service.is_login_loading or self.app.auth_service.is_signup_loading
         )
-        if is_loading:
-            self.interative_components[2].active = True
 
-        if self.show_error:
-            self.non_interative[-1].label = self.error_message
-            self.interative_components[2].active = False
+        if self.error_message:
+            self.texts[-1].label = self.error_message
+            self.loading_state.active = False
         else:
-            self.non_interative[-1].label = ""
+            self.texts[-1].label = ""
 
     def update(self) -> None:
         # Check for auth service errors
         if not self.is_signup_mode:
             error = self.app.auth_service.get_login_error()
             if error:
-                self.show_error = True
                 self.error_message = error
         else:
             error = self.app.auth_service.get_signup_error()
             if error:
-                self.show_error = True
                 self.error_message = error
 
-        if self.components[2].active:
-            self.components[2].is_disabled = True
+        if self.loading_state.active:
+            self.loading_state.is_disabled = True
 
         # Call parent update to handle events
         super().update()
 
     def _submit(self) -> None:
-        # Clear previous errors
-        self.interative_components[2].active = True
-
-        self.show_error = False
-        self.error_message = ""
+        self.loading_state.active = True
 
         # Validate input
-        if not self.components[0].value:
-            self.show_error = True
+        if not self.inputs[0].value:
             self.error_message = "Username cannot be empty"
             return
 
-        if not self.components[1].value:
-            self.show_error = True
+        if not self.inputs[1].value:
             self.error_message = "Password cannot be empty"
             return
 
-        if len(self.components[1].value) < 6:
-            self.show_error = True
+        if len(self.inputs[1].value) < 6:
             self.error_message = "Password must be at least 6 characters"
             return
 
@@ -215,33 +200,21 @@ class LoginScene(BaseScene):
 
         # Submit based on mode
         if self.is_signup_mode:
-            self.app.auth_service.signup(self.components[0].value, self.components[1].value)
+            self.app.auth_service.signup(self.inputs[0].value, self.inputs[1].value)
         else:
-            self.app.auth_service.login(self.components[0].value, self.components[1].value)
+            self.app.auth_service.login(self.inputs[0].value, self.inputs[1].value)
 
     def _on_login_success(self, token: str) -> None:
         """Called when login/signup is successful"""
         self.app.current_scene = Scenes.MAIN_MENU
-        self.interative_components[2].is_disabled = False
 
     def _on_login_error(self, error_message: str) -> None:
         """Called when login/signup fails"""
-        self.show_error = True
-        self.error_message = error_message
-        self.components[2].is_disabled = False
 
-    def change_scene(
-        self,
-        scene: Scenes,
-        alt_scene_conditioned: tuple[bool | None, BaseScene] = (None, BaseScene),
-    ) -> None:
-        condition, alt_scene = alt_scene_conditioned
-        if alt_scene is None:
-            self.app.current_scene = scene
-        else:
-            self.app.current_scene = alt_scene if condition else scene
+        self.error_message = error_message
+        self.loading_state.is_disabled = False
 
     def authentication_change(self) -> None:
         self.is_signup_mode = not self.is_signup_mode
-        self.interative_components[4].label = "Login" if self.is_signup_mode else "Sing-In"
-        self.non_interative[0].label = "Sing-In" if self.is_signup_mode else "Login"
+        self.buttons[1].label = "Login" if self.is_signup_mode else "Sign-up"
+        self.texts[0].label = "Cadastro" if self.is_signup_mode else "Login"
