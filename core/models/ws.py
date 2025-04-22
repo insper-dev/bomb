@@ -10,8 +10,7 @@ from core.types import PlayerDirectionState
 class WebSocketCloseCode(IntEnum):
     """Custom close codes for WebSocket"""
 
-    NORMAL = 1000
-    MATCH_FOUND = 4000
+    MATCH_FOUND = 1000
     LEAVE_QUEUE = 4001
     ERROR = 4002
     UNAUTHORIZED = 4003
