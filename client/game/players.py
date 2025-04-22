@@ -120,12 +120,9 @@ class Player:
             "left": (pos[0] - 1, pos[1]),
         }
         x, y = around[key]
-        print(x, y)
         if y >= len(self.map) or x >= len(self.map[0]) or y < 0 or x < 0:
-            print((x, y))
             return
         if self.map[y][x] in BLCOKS.keys():
-            print(self.map[y][x])
             return
 
         self.moviment_state = key

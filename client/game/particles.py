@@ -54,7 +54,6 @@ class Particles:
             2: "donw",
             3: "right",
         }
-        print(self.range_directions.values())
 
         for i in range(self.radius + 1):
             if i == 0:

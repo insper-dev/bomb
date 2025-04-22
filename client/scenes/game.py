@@ -54,10 +54,7 @@ class GameScene(BaseScene):
         # Initiate map
         with open(Path("client/game/maps.json")) as map:
             self.map = json.load(map)["map2"]
-        self.margin: tuple[int, int] = (
-            int(self.app.screen_center[0] - (len(self.map[0]) * MODULE_SIZE) // 2),
-            int(self.app.screen_center[1] - (len(self.map) * MODULE_SIZE) // 2),
-        )
+        self._calc_margin()
         self._initiate_map()
 
         # Local init state
@@ -71,7 +68,6 @@ class GameScene(BaseScene):
 
     def _create_playes_objects(self, state: GameState) -> None:
         for player_id, pstate in state.players.items():
-            print(pstate.x, pstate.y)
             self.players[player_id] = Carlitos(
                 self.app.screen,
                 (
@@ -105,6 +101,12 @@ class GameScene(BaseScene):
                     pre_list.append((surface, rect))
             self.blocks.append(pre_list)
             pre_list = []
+
+    def _calc_margin(self) -> None:
+        self.margin: tuple[int, int] = (
+            int(self.app.screen_center[0] - (len(self.map[0]) * MODULE_SIZE) // 2),
+            int(self.app.screen_center[1] - (len(self.map) * MODULE_SIZE) // 2),
+        )
 
     def handle_event(self, event) -> None:
         if event.type == pygame.QUIT:
