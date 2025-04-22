@@ -2,7 +2,7 @@ from typing import Literal
 
 import pygame
 
-from core.constants import BOMB_COKING
+from core.constants import BOMB_COKING, MODULE_SIZE
 
 
 class Bomb:
@@ -10,12 +10,18 @@ class Bomb:
         self,
         screen: pygame.Surface,
         position: tuple[int, int],
+        margin: tuple[int, int],
     ) -> None:
         self.screen = screen
         self.sprites = BOMB_COKING
-        self.position = position
+        self.margin = margin
+        self.relative_position = position
+        self.position: tuple[int, int] = (
+            self.relative_position[0] * MODULE_SIZE + self.margin[0],
+            self.relative_position[1] * MODULE_SIZE + self.margin[1],
+        )
         self.sprite_index = 0
-        self.tick = 500  # mileconds
+        self.tick = 200  # mileconds
         self.explosion_time = self.tick * len(self.sprites)
         self.explode = False
         self._initialize_timer()

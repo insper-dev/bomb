@@ -237,14 +237,10 @@ BOMB_COKING: list[pygame.Surface] = [
 PARTICLES_PATH = IMAGES_PATH / "particles"
 EXPLOSION_PARTICLES: dict[ParticleType, list[pygame.Surface]] = {
     "geo": [
-        pygame.transform.rotate(
-            pygame.transform.scale(
-                pygame.image.load(PARTICLES_PATH / "particles_geo.jpeg"),
-                (MODULE_SIZE, MODULE_SIZE),
-            ),
-            angle,
+        pygame.transform.scale(
+            pygame.image.load(PARTICLES_PATH / "particles_geo.jpeg"),
+            (MODULE_SIZE, MODULE_SIZE),
         )
-        for angle in range(0, 271, 90)
     ],
     "tip": [
         pygame.transform.rotate(

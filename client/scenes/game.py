@@ -9,7 +9,7 @@ from client.game.particles import Particles
 from client.game.players import Carlitos, Player
 from client.scenes.base import BaseScene, Scenes
 from client.services.game import GameService
-from core.constants import FLOORS, MODULE_SIZE
+from core.constants import FLOORS, MODULE_SIZE, PURPLE
 from core.models.game import GameState, GameStatus
 
 
@@ -70,6 +70,7 @@ class GameScene(BaseScene):
 
     def _create_playes_objects(self, state: GameState) -> None:
         for player_id, pstate in state.players.items():
+            print(pstate.x, pstate.y)
             self.players[player_id] = Carlitos(
                 self.app.screen,
                 (
@@ -121,7 +122,6 @@ class GameScene(BaseScene):
                     if user is not None and user.id != pid and pid == id:
                         player.moviment_state = psta.movement_state
             if user is not None and user.id == pid:
-                print(user.id)
                 player.handle_events(event)
                 if (
                     event.type == pygame.KEYDOWN
@@ -129,7 +129,7 @@ class GameScene(BaseScene):
                     and not self.game_service.is_game_ended
                 ):
                     self.game_service.send_bomb(
-                        explosion_radius=player.status["power"], explosion_time=3.2
+                        explosion_radius=player.status["power"], explosion_time=1
                     )
 
     def update(self) -> None:
@@ -148,7 +148,7 @@ class GameScene(BaseScene):
 
     def render(self) -> None:
         screen = self.app.screen
-        screen.fill((0, 0, 0))
+        screen.fill(PURPLE)
         state = self.game_service.state
         if not state:
             return
@@ -194,9 +194,9 @@ class GameScene(BaseScene):
 
         for bomb in state.bombs:
             if bomb.bomb_id not in self.bombs:
-                x = self.margin[0] + bomb.x * MODULE_SIZE
-                y = self.margin[1] + bomb.y * MODULE_SIZE
-                self.bombs[bomb.bomb_id] = Bomb(self.app.screen, (x, y))
+                x = bomb.x
+                y = bomb.y
+                self.bombs[bomb.bomb_id] = Bomb(self.app.screen, (x, y), self.margin)
 
         for bomb in self.bombs.values():
             bomb.render()

@@ -7,10 +7,16 @@ from core.constants import EXPLOSION_PARTICLES, MODULE_SIZE
 
 class Particles:
     def __init__(
-        self, screen: pygame.Surface, partcles, position: tuple[int, int], radius: int
+        self,
+        screen: pygame.Surface,
+        partcles,
+        position: tuple[int, int],
+        radius: int,
+        map: list[list[str]],
     ) -> None:
         self.screen = screen
         self.paticles = partcles
+        self.map = map
         self.images: dict[Literal["geo", "tail", "tip"], list[pygame.Surface]] = EXPLOSION_PARTICLES
         self.position = position
         self.radius = radius
@@ -19,7 +25,11 @@ class Particles:
 
     def _draw(self) -> None:
         main_surface = pygame.Surface(
-            (MODULE_SIZE * 2 + MODULE_SIZE, MODULE_SIZE * 2 + MODULE_SIZE), flags=pygame.SRCALPHA
+            (
+                MODULE_SIZE * 2 * self.radius + MODULE_SIZE,
+                MODULE_SIZE * 2 * self.radius + MODULE_SIZE,
+            ),
+            flags=pygame.SRCALPHA,
         )
         main_surface = main_surface.convert_alpha()
         width, height = main_surface.get_size()
