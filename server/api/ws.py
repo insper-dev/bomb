@@ -127,6 +127,7 @@ async def game_ws(websocket: WebSocket, game_id: str) -> None:
                 dx, dy = MovimentEvent.dxdy(ev.direction)
                 game.move_player(user.id, dx, dy, ev.direction)
                 await game_service.broadcast_state(game_id)
+                # TODO: adicionar task de set stand_by após k miliseconds para esse user.id.
 
             elif isinstance(ev, PlaceBombEvent):
                 # Place bomb at x, y (server assigns timing)

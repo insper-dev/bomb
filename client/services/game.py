@@ -25,12 +25,16 @@ class GameService(ServiceBase):
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self._game_ended_callbacks: list[Callable[[GameStatus, str | None], None]] = []
+        self._moviment_callbacks: list[Callable[[tuple[int, int]], None]] = []
 
     def register_game_ended_callback(
         self, callback: Callable[[GameStatus, str | None], None]
     ) -> None:
         """Register a callback for when the game ends."""
         self._game_ended_callbacks.append(callback)
+
+    def register_moviment_callback(self, callback: Callable[[tuple[int, int]], None]) -> None:
+        self._moviment_callbacks.append(callback)
 
     def start(self, match_id: str) -> None:
         """Start WebSocket thread for real-time game updates."""
@@ -68,9 +72,17 @@ class GameService(ServiceBase):
         user = self.app.auth_service.current_user
         if not user:
             return
+
         # Local state update
         dx, dy = MovimentEvent.dxdy(direction)
-        self.state.move_player(user.id, dx, dy, direction)
+        new_position = self.state.move_player(user.id, dx, dy, direction)
+
+        if new_position is None:
+            return
+
+        for cb in self._moviment_callbacks:
+            cb(new_position)
+
         # Send to server
         ev = MovimentEvent(direction=direction)
         asyncio.run_coroutine_threadsafe(
@@ -133,4 +145,5 @@ class GameService(ServiceBase):
             self.running = False
             self.websocket = None
             if self._loop:
+                self._loop.stop()
                 self._loop.stop()

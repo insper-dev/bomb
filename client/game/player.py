@@ -3,7 +3,7 @@ from collections.abc import Callable
 import pygame
 
 from client.services.game import GameService
-from core.constants import PLAYERS_MAP
+from core.constants import MODULE_SIZE, PLAYERS_MAP
 from core.models.game import GameState, PlayerState
 from core.types import PlayerDirectionState
 
@@ -14,16 +14,20 @@ class Player:
         self.game_service = game_service
         self.app = game_service.app
         self.margin = margin
-        self.last_position = (0, 0)
+        self.__real_position = (0, 0)
         self.__sprite_index: int = 0
         self.__initial_time = pygame.time.get_ticks()
         self.__time_counter = 0
         self.__velocity = 200
+        self.__distance = 0
+        self.__is_moving = False
         self.game_service.register_moviment_callback(self._on_move_callback)
 
     def _on_move_callback(self, position: tuple[int, int]) -> None:
-        self.last_position = position
+        self.__is_moving = True
+        self.__real_position = position
         self.__initial_time = pygame.time.get_ticks()
+        self.__distance = 0
 
     @property
     def time_elapsed(self) -> int:
@@ -65,7 +69,15 @@ class Player:
         if self.current_player_state is None:
             return (0, 0)
 
+        if not self.__is_moving:
+            return (
+                self.current_player_state.x * MODULE_SIZE + self.margin[0],
+                self.current_player_state.y * MODULE_SIZE + self.margin[1],
+            )
+
         walked_distance = self.__velocity * self.time_elapsed
+        self.__distance += walked_distance
+        self.__is_moving = self.__distance < MODULE_SIZE
 
         move_map: dict[PlayerDirectionState, Callable] = {
             "up": lambda x, y: (x, y - walked_distance),
@@ -73,17 +85,10 @@ class Player:
             "left": lambda x, y: (x - walked_distance, y),
             "right": lambda x, y: (x + walked_distance, y),
         }
-
         fn = move_map[self.current_player_state.direction_state]
-        self.last_position = fn(self.last_position)
-        return self.last_position
+        self.__real_position = fn(self.__real_position)
 
-    @property
-    def is_moving(self) -> bool:
-        if self.current_player_state is None:
-            return False
-
-        return self.current_player_state.direction_state != "stand_by"
+        return self.__real_position
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type == pygame.KEYDOWN:
@@ -93,7 +98,7 @@ class Player:
                 pygame.K_LEFT: "left",
                 pygame.K_RIGHT: "right",
             }
-            if event.key in key_map and not self.is_moving:
+            if event.key in key_map and not self.__is_moving:
                 self.game_service.send_move(key_map[event.key])
             elif event.key == pygame.K_SPACE:
                 self.game_service.send_bomb()

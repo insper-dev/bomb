@@ -14,6 +14,7 @@ from core.types import (
     IsFocused,
     ParticleType,
     PlayerDirectionState,
+    PlayerType,
     Thickness,
 )
 
@@ -265,7 +266,6 @@ EXPLOSION_PARTICLES: dict[ParticleType, list[pygame.Surface]] = {
 }
 
 # Players
-# TODO: explícito é melhor que implícito.
 CARLITOS_PATH = IMAGES_PATH / "carlitos_player"
 CARLITOS: dict[PlayerDirectionState, list[pygame.Surface]] = {
     "right": [
@@ -358,6 +358,106 @@ CARLITOS: dict[PlayerDirectionState, list[pygame.Surface]] = {
             (MODULE_SIZE, MODULE_SIZE),
         ),
     ],
+}
+
+ROGERIO_PATH = IMAGES_PATH / "rogerio_player"
+ROGERIO: dict[PlayerDirectionState, list[pygame.Surface]] = {
+    "right": [
+        pygame.transform.scale(
+            pygame.image.load(ROGERIO_PATH / "horizontal_1.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(ROGERIO_PATH / "horizontal_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(ROGERIO_PATH / "horizontal_3.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+    "left": [
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(ROGERIO_PATH / "horizontal_1.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(ROGERIO_PATH / "horizontal_2.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(ROGERIO_PATH / "horizontal_3.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+    ],
+    "down": [
+        pygame.transform.scale(
+            pygame.image.load(ROGERIO_PATH / "front_1.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(ROGERIO_PATH / "front_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(ROGERIO_PATH / "front_3.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+    "up": [
+        pygame.transform.scale(
+            pygame.image.load(ROGERIO_PATH / "back_1.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(ROGERIO_PATH / "back_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(ROGERIO_PATH / "back_3.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+    "stand_by": [
+        pygame.transform.scale(
+            pygame.image.load(ROGERIO_PATH / "horizontal_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(ROGERIO_PATH / "horizontal_2.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+        pygame.transform.scale(
+            pygame.image.load(ROGERIO_PATH / "front_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(ROGERIO_PATH / "back_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+}
+
+
+PLAYERS_MAP: dict[PlayerType, dict[PlayerDirectionState, list[pygame.Surface]]] = {
+    "carlitos": CARLITOS,
+    "rogerio": ROGERIO,
 }
 
 

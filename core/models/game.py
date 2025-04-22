@@ -6,7 +6,7 @@ from uuid import uuid4
 from prisma.models import User
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
-from core.types import PlayerDirectionState
+from core.types import PlayerDirectionState, PlayerType
 
 
 class GameStatus(str, Enum):
@@ -52,7 +52,7 @@ class PlayerState(BaseModel):
     y: int = 0
     # TODO: to type the power ups and skin.
     power_ups: list[str] = Field(default_factory=list)
-    skin: str = "carlitos"
+    skin: PlayerType = Field(default_factory=lambda: random.choice(["carlitos", "rogerio"]))
     bombs: list[BombState] = Field(default_factory=list)
 
 
@@ -117,12 +117,8 @@ class GameState(BaseModel):
             )
 
     def move_player(
-        self,
-        player_id: str,
-        dx: int,
-        dy: int,
-        direction: PlayerDirectionState,
-    ) -> None:
+        self, player_id: str, dx: int, dy: int, direction: PlayerDirectionState
+    ) -> tuple[int, int] | None:
         """Move a player if possible considering walls and map boundaries"""
         # Don't allow moves if game is over
         if self.status != GameStatus.PLAYING:
@@ -140,6 +136,7 @@ class GameState(BaseModel):
             return
 
         p.x, p.y, p.direction_state = new_x, new_y, direction
+        return new_x, new_y
 
     def end_game(self, winner_id: str | None = None) -> None:
         """End the game, optionally with a winner"""
