@@ -221,10 +221,7 @@ class LoginScene(BaseScene):
 
     def _on_login_success(self, token: str) -> None:
         """Called when login/signup is successful"""
-        # Redirect to the main menu
-
-        if self.app.auth_service.is_logged_in:
-            self.app.current_scene = Scenes.MAIN_MENU
+        self.app.current_scene = Scenes.MAIN_MENU
         self.interative_components[2].is_disabled = False
 
     def _on_login_error(self, error_message: str) -> None:
