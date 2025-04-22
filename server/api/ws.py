@@ -125,9 +125,10 @@ async def game_ws(websocket: WebSocket, game_id: str) -> None:
                     "down": (0, 1),
                     "left": (-1, 0),
                     "right": (1, 0),
+                    "stand_by": (0, 0),
                 }[ev.direction]
                 game = game_service.get_game(game_id)
-                game.move_player(user.id, dx, dy)
+                game.move_player(user.id, dx, dy, ev.direction)
                 await game_service.broadcast_state(game_id)
             elif ev.event == "place_bomb":
                 # coloca bomba e agenda explosão

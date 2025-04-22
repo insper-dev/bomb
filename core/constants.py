@@ -184,6 +184,28 @@ GAME_ALPHABET_KEYS = [pygame.key.key_code(key) for key in "abcdefghijklmnopqrstu
 
 MODULE_SIZE = 64
 
+# Blocks and Floors
+BLOCKS_PATH = IMAGES_PATH / "blocks"
+
+BLCOKS: dict[str, pygame.Surface] = {
+    "areia": pygame.transform.scale(
+        pygame.image.load(BLOCKS_PATH / "Areia.png"), (MODULE_SIZE, MODULE_SIZE)
+    ),
+    "caixa": pygame.transform.scale(
+        pygame.image.load(BLOCKS_PATH / "Caixa.png"), (MODULE_SIZE, MODULE_SIZE)
+    ),
+    "diamante": pygame.transform.scale(
+        pygame.image.load(BLOCKS_PATH / "Diamante.png"), (MODULE_SIZE, MODULE_SIZE)
+    ),
+    "metal": pygame.transform.scale(
+        pygame.image.load(BLOCKS_PATH / "Metal.png"), (MODULE_SIZE, MODULE_SIZE)
+    ),
+}
+
+FLOORS: dict[str, pygame.Color] = {
+    "f_shed1": pygame.Color(23, 23, 23),
+    "f_sehd2": pygame.Color(5, 5, 5),
+}
 
 # Bomb
 BOMB_PATH = IMAGES_PATH / "bomb"

@@ -1,13 +1,13 @@
 import asyncio
 import json
 import threading
-from typing import Literal
 
 from websockets import ClientConnection, ConnectionClosed, connect
 
 from client.services.base import ServiceBase
 from core.models.game import GameState, GameStatus
 from core.models.ws import MovimentEvent, PlaceBombEvent
+from core.types import PlayerDirectionState
 
 
 class GameService(ServiceBase):
@@ -82,8 +82,8 @@ class GameService(ServiceBase):
             except Exception as e:
                 print(f"Error joining thread: {e}")
 
-    def send_move(self, direction: Literal["up", "down", "left", "right"]) -> None:
-        """Send a move command: 'up', 'down', 'left' or 'right'."""
+    def send_move(self, direction: PlayerDirectionState) -> None:
+        """Send a move command: 'up', 'down', 'left' or 'right', 'stand_by."""
         if not self.running or not self.websocket or not self._loop:
             return
 

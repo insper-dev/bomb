@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     server_endpoint_ssl: bool = True
 
     client_title: str = "Lara Bomb"
-    client_width: int = 800
-    client_height: int = 600
+    client_width: int = 1280  # 800 or 1280
+    client_height: int = 800  # 600 or 080
     client_fps: int = 60
 
     class Config:
