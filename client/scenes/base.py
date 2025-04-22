@@ -48,6 +48,8 @@ class BaseScene(ABC):
         Handle events for the scene.
         """
         if event.type == pygame.QUIT:
+            if self.app.matchmaking_service.running:
+                self.app.matchmaking_service.stop()
             self.app.running = False
 
         self.handle_event(event)

@@ -16,11 +16,7 @@ class MatchmakingScene(BaseScene):
         self.font = pygame.font.SysFont(None, 48)
 
     def handle_event(self, event) -> None:
-        if event.type == pygame.QUIT:
-            self.matchmaking.stop()
-            self.app.running = False
-
-        elif event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN:
             # Allow user to cancel matchmaking
             if event.key == pygame.K_ESCAPE:
                 self.matchmaking.stop()
