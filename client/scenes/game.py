@@ -15,7 +15,6 @@ class GameScene(BaseScene):
         super().__init__(app)
         self.service: GameService = app.game_service
         self.match_id: str = app.matchmaking_service.match_id or ""
-        self.service.start(self.match_id)
         self.service.register_game_ended_callback(self._on_game_end)
 
         self.state: GameState | None = None
@@ -28,6 +27,7 @@ class GameScene(BaseScene):
 
         # Initiate bombs kaboom
         self.bombs: list[Bomb] = []
+        print("GameScene.__init__ completed")
 
     def _on_game_end(self, status: GameStatus, winner: str | None) -> None:
         # TODO: mover pra cena de game over
@@ -39,6 +39,10 @@ class GameScene(BaseScene):
             self.players[id] = Player(self.service, self.margim)
 
     def _calc_margin(self, state: GameState) -> None:
+        if state.map is None:
+            print("WARNING: state.map is None in _calc_margin")
+            return
+
         y = self.app.screen_center[0] - len(state.map) * MODULE_SIZE // 2
         x = self.app.screen_center[1] - len(state.map[0]) * MODULE_SIZE // 2
         self.margim = (x, y)
@@ -46,6 +50,7 @@ class GameScene(BaseScene):
     def handle_event(self, event: pygame.event.Event) -> None:
         # Exit to menu
         if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+            print("Exit key pressed, stopping service and returning to START scene")
             self.service.stop()
             self.app.current_scene = Scenes.START
             return
@@ -53,9 +58,11 @@ class GameScene(BaseScene):
         # TODO: instancia de player
         state = self.service.state
         user = self.app.auth_service.current_user
+        print(f"handle_event: state exists: {state is not None}, user exists: {user is not None}")
         if state is not None and user is not None:
             for id, player in self.players.items():
                 if id == user.id:
+                    print(f"Passing event to player {id}")
                     player.handle_event(event)
 
         # TODO: passar o evento para o player
@@ -67,13 +74,9 @@ class GameScene(BaseScene):
         if self.state is None:
             return
 
-        # Calculate margin
         self._calc_margin(self.state)
-
-        # Initiate Players object
         self._init_players(self.state)
 
-        # Check end delay
         super().update()
 
     def render(self) -> None:
@@ -81,6 +84,7 @@ class GameScene(BaseScene):
         screen.fill(PURPLE)
         if not self.state:
             return
+
         # Compute margin once
         map_h = len(self.state.map)
         map_w = len(self.state.map[0]) if map_h else 0
@@ -94,8 +98,13 @@ class GameScene(BaseScene):
                     MODULE_SIZE,
                     MODULE_SIZE,
                 )
-                block = BLOCKS[cell]
-                screen.blit(block, rect)
+                try:
+                    block = BLOCKS[cell]
+                    screen.blit(block, rect)
+                except KeyError:
+                    print(f"ERROR: Invalid cell type '{cell}' at position ({x}, {y})")
+                except Exception as e:
+                    print(f"ERROR drawing tile at ({x}, {y}): {e!s}")
 
         # Draw grid lines
         for y in range(map_h + 1):
@@ -131,7 +140,10 @@ class GameScene(BaseScene):
                 if bomb.exploded_at:
                     # If bomb exploded, draw explosion particles
                     core_rect = bomb_rect.copy()
-                    screen.blit(EXPLOSION_PARTICLES["geo"][0], core_rect)
+                    try:
+                        screen.blit(EXPLOSION_PARTICLES["geo"][0], core_rect)
+                    except Exception as e:
+                        print(f"ERROR drawing explosion core: {e!s}")
 
                     # Draw explosion in four directions
                     for i, direction in enumerate([(0, -1), (1, 0), (0, 1), (-1, 0)]):
@@ -142,9 +154,15 @@ class GameScene(BaseScene):
                             MODULE_SIZE,
                             MODULE_SIZE,
                         )
-                        screen.blit(EXPLOSION_PARTICLES["tip"][i], exp_rect)
+                        try:
+                            screen.blit(EXPLOSION_PARTICLES["tip"][i], exp_rect)
+                        except Exception as e:
+                            print(f"ERROR drawing explosion tip {i}: {e!s}")
                 else:
                     # Bomb cooking animation
                     frame_idx = (pygame.time.get_ticks() // 200) % len(BOMB_COKING)
-                    bomb_sprite = BOMB_COKING[frame_idx]
-                    screen.blit(bomb_sprite, bomb_rect)
+                    try:
+                        bomb_sprite = BOMB_COKING[frame_idx]
+                        screen.blit(bomb_sprite, bomb_rect)
+                    except Exception as e:
+                        print(f"ERROR drawing bomb: {e!s}")

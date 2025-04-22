@@ -3,8 +3,7 @@ import json
 import threading
 from collections.abc import Callable
 
-from websockets import ConnectionClosed, connect
-from websockets.client import ClientConnection
+from websockets import ClientConnection, ConnectionClosed, connect
 
 from client.services.base import ServiceBase
 from core.models.game import BombState, GameState, GameStatus
@@ -113,7 +112,10 @@ class GameService(ServiceBase):
         asyncio.set_event_loop(self._loop)
         if not self._loop:
             return
-        self._loop.run_until_complete(self._connect())
+        try:
+            self._loop.run_until_complete(self._connect())
+        except Exception as e:
+            print(f"[ERROR] Event loop exception: {e}")
 
     async def _connect(self) -> None:
         """Coroutine to manage WebSocket connection and incoming messages."""
@@ -140,10 +142,9 @@ class GameService(ServiceBase):
                     except ConnectionClosed:
                         break
         except Exception as e:
-            print(f"GameService connection error: {e}")
+            print(f"[ERROR] GameService connection error: {e}")
         finally:
             self.running = False
             self.websocket = None
             if self._loop:
-                self._loop.stop()
                 self._loop.stop()
