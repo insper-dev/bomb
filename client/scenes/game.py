@@ -159,7 +159,13 @@ class GameScene(BaseScene):
                             py = self.margin[1] + ty * MODULE_SIZE
                             is_last = tiles and (tx, ty) == tiles[-1]
                             part = "tip" if is_last else "tail"
-                            sprite = EXPLOSION_PARTICLES[part][dir_idx]
+                            # Fix for inverted left/right directions
+                            fixed_dir_idx = dir_idx
+                            if dir_idx == 1:
+                                fixed_dir_idx = 3
+                            elif dir_idx == 3:
+                                fixed_dir_idx = 1
+                            sprite = EXPLOSION_PARTICLES[part][fixed_dir_idx]
                             screen.blit(sprite, (px, py))
 
     def _draw_hud(self, screen: pygame.Surface, screen_w: int) -> None:
