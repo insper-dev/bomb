@@ -37,8 +37,13 @@ class BombState(BaseModel):
 
     @field_validator("placed_at", "exploded_at", mode="before")
     @classmethod
-    def validate_placed_at(cls, value) -> datetime:
-        return value if value else datetime.fromisoformat(value)
+    def validate_placed_at(cls, value) -> datetime | None:
+        if value is None:
+            return
+        elif isinstance(value, str):
+            return datetime.fromisoformat(value)
+
+        return value
 
     @field_serializer("placed_at", "exploded_at")
     def serialize_exploded_at(self, value) -> str | None:
