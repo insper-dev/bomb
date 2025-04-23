@@ -4,7 +4,6 @@ from enum import Enum
 from uuid import uuid4
 
 from icecream import ic
-from prisma.models import User
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from core.types import PlayerDirectionState, PlayerType
@@ -120,18 +119,6 @@ class GameState(BaseModel):
     map: list[list[MapBlockType]] = Field(default_factory=generate_map)
     status: GameStatus = GameStatus.PLAYING
     winner_id: str | None = None
-
-    def add_players(self, players: list[User]) -> None:
-        """Add players to the game with initial positions"""
-        positions = [(1, 1), (10, 10)]  # Starting positions for 2 players
-        ic(f"Adding {len(players)} players to game {self.game_id}")
-
-        for i, player in enumerate(players):
-            x, y = positions[i] if i < len(positions) else (0, 0)
-            self.players[player.username] = PlayerState(
-                username=player.username, direction_state="stand_by", x=x, y=y
-            )
-            ic(f"Player {player.username} added at position ({x}, {y})")
 
     def move_player(
         self, player_id: str, dx: int, dy: int, direction: PlayerDirectionState

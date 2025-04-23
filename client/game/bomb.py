@@ -47,6 +47,7 @@ class Bomb:
     def _coking(self) -> None:
         if self.sprite_index >= len(self.sprites):
             self.ready = True
+            del self
             return
         self.__draw()
         if self.time["time_counter"] >= self.tick:
