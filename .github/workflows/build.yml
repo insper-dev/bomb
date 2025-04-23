@@ -27,13 +27,7 @@ jobs:
 
       - name: Compilar com PyInstaller
         run: |
-          pyinstaller \
-            --noconfirm --clean \
-            --onefile \
-            --windowed \
-            --name lara-bomb \
-            --add-data "client\\assets;assets" \
-            main.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name lara-bomb --add-data "client\assets;assets" main.py
 
       - name: Publicar artefato Windows
         uses: actions/upload-artifact@v4
