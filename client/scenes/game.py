@@ -1,6 +1,7 @@
 import json
 from copy import deepcopy
 from pathlib import Path
+from typing import Literal
 
 import pygame
 
@@ -12,6 +13,7 @@ from client.scenes.base import BaseScene, Scenes
 from client.services.game import GameService
 from core.constants import FLOORS, MODULE_SIZE, PURPLE
 from core.models.game import GameState, GameStatus
+from core.types import PlayerDirectionState
 
 
 class GameScene(BaseScene):
@@ -27,7 +29,6 @@ class GameScene(BaseScene):
         self.song = "client/assets/sounds/map1_song.mpeg"
         pygame.mixer.music.load(self.song)
         pygame.mixer.music.play(-1)
-        pygame.mixer.music.stop()
 
         # Register callback for game end
         self.game_service.register_game_ended_callback(self._on_game_ended)
@@ -115,21 +116,27 @@ class GameScene(BaseScene):
                 self.game_service.stop()
                 self.app.current_scene = Scenes.START
 
-        for pid, player in self.players.items():
-            user = self.app.auth_service.current_user
-            state = self.game_service.state
-            if state is not None:
-                for id, psta in state.players.items():
-                    if user is not None and user.id != pid and pid == id:
-                        player.moviment_state = psta.movement_state
-            if user is not None and user.id == pid:
-                player.handle_events(event)
-                if (
-                    event.type == pygame.KEYDOWN
-                    and event.key == pygame.K_SPACE
-                    and not self.game_service.is_game_ended
-                ):
-                    self.game_service.send_bomb()
+            directions: dict[int, PlayerDirectionState | Literal["space_bar"]] = {
+                pygame.K_LEFT: "left",
+                pygame.K_RIGHT: "right",
+                pygame.K_UP: "up",
+                pygame.K_DOWN: "down",
+                pygame.K_SPACE: "space_bar",
+            }
+            if event.key in directions:
+                key = directions[event.key]
+
+                # Interate over the players objects
+                for pid, player_object in self.players.items():
+                    user = self.app.auth_service.current_user
+                    if user is not None and user.id == pid:
+                        if key == "space_bar":
+                            self.game_service.send_bomb()
+                        else:
+                            print("here")
+                            if player_object.change_moviment_state(key):
+                                print("there")
+                                self.game_service.send_move(key)
 
     def update(self) -> None:
         # Primeiro verificamos se o jogo sinalizou que acabou e devemos transitar para o game over
@@ -178,24 +185,31 @@ class GameScene(BaseScene):
             self._create_playes_objects(state)
             self.players_initialized = True
 
-        for player_id, player_state in state.players.items():
-            for id, player in self.players.items():
-                if id == player_id:
-                    if player.moviment_state == "stand_by":
-                        x = player_state.x
-                        y = player_state.y
-                        if player.last_position != (x, y):
-                            player.relative_position = (x, y)
-        for player in self.players.values():
-            player.render()
+        for pid, player_object in self.players.items():
+            for id, pstd in state.players.items():
+                user = self.app.auth_service.current_user
+                if (
+                    user is not None
+                    and pid == id != user.id
+                    and player_object.moviment_state == "stand_by"
+                    and pstd.movement_state != "stand_by"
+                ):
+                    player_object.change_moviment_state(pstd.movement_state)
+                    player_object.relative_position = (pstd.x, pstd.y)
+
+            player_object.render()
+
+        for e in state.players.values():
+            e.movement_state = "stand_by"
+
+        for i, std in enumerate(state.players.values()):
+            print(i, std.movement_state)
 
         # Draw bombs
 
         for bomb in state.bombs:
             if bomb.bomb_id not in self.bombs:
-                x = bomb.x
-                y = bomb.y
-                self.bombs[bomb.bomb_id] = Bomb(self.app.screen, (x, y), self.margin)
+                self.bombs[bomb.bomb_id] = Bomb(self.app.screen, (bomb.x, bomb.y), self.margin)
 
         for bomb in self.bombs.values():
             bomb.render()

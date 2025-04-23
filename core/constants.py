@@ -190,7 +190,7 @@ BLOCKS_PATH = IMAGES_PATH / "blocks"
 
 DESTROYABLE_BLOCKS: list[str] = ["caixa", "areia"]
 
-BLCOKS: dict[str, pygame.Surface] = {
+BLOCKS: dict[str, pygame.Surface] = {
     "areia": pygame.transform.scale(
         pygame.image.load(BLOCKS_PATH / "Areia.png"), (MODULE_SIZE, MODULE_SIZE)
     ),

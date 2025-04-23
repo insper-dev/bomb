@@ -2,7 +2,7 @@ from typing import Literal
 
 import pygame
 
-from core.constants import BLCOKS, DESTROYABLE_BLOCKS, EXPLOSION_PARTICLES, MODULE_SIZE
+from core.constants import BLOCKS, DESTROYABLE_BLOCKS, EXPLOSION_PARTICLES, MODULE_SIZE
 
 
 class Particles:
@@ -105,7 +105,7 @@ class Particles:
                 if (
                     direction not in off
                     and (len(self.map[0]) > x >= 0 and len(self.map) > y >= 0)
-                    and self.map[y][x] in BLCOKS.keys()
+                    and self.map[y][x] in BLOCKS.keys()
                 ):
                     if self.map[y][x] in DESTROYABLE_BLOCKS:
                         self.map[y][x] = "f_shed1"

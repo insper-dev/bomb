@@ -45,7 +45,7 @@ class GameState(BaseModel):
 
     def add_players(self, player_ids: list[str]) -> None:
         """Add players to the game with initial positions"""
-        positions = [(1, 1), (10, 10)]  # Starting positions for 2 players
+        positions = [(1, 1), (8, 8)]  # Starting positions for 2 players
 
         for i, pid in enumerate(player_ids):
             x, y = positions[i] if i < len(positions) else (0, 0)

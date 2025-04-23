@@ -17,7 +17,7 @@ class WebSocketCloseCode(IntEnum):
 
 class MovimentEvent(BaseModel):
     event: Literal["move"] = "move"
-    direction: Literal["up", "down", "left", "right"]
+    direction: Literal["up", "down", "left", "right", "stand_by"]
 
 
 class PlaceBombEvent(BaseModel):

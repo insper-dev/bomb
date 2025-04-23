@@ -8,9 +8,7 @@ class MainMenuScene(BaseScene):
     def __init__(self, app) -> None:
         super().__init__(app)
         self.app = app
-        self.app.auth_service.get_current_user()
         self.active_button = 0
-
         self.non_interative: list[BaseComponent] = [
             Text(
                 self.app.screen,
@@ -70,7 +68,6 @@ class MainMenuScene(BaseScene):
                 callback=lambda: self.app.auth_service.logout(),
             ),
         ]
-
         self.components = self.interative_components + self.non_interative
         self.app.auth_service.register_logout_callback(self._on_logout)
 
@@ -86,9 +83,9 @@ class MainMenuScene(BaseScene):
 
     def render(self) -> None:
         self.app.screen.fill((1, 5, 68))
-
         if self.app.auth_service.is_logged_in and (user := self.app.auth_service.current_user):
             self.interative_components[3].is_disabled = False
+            self.app.auth_service.is_login_loading  # noqa: B018
             self.non_interative[1].label = f"Welcome: {user.username}"
         else:
             self.interative_components[3].is_disabled = True
