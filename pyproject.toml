@@ -8,6 +8,7 @@ dependencies = [
     "argon2-cffi>=23.1.0",
     "fastapi>=0.115.12",
     "httpx>=0.28.1",
+    "icecream>=2.1.4",
     "prisma>=0.15.0",
     "pydantic==2.11.3",
     "pydantic-settings>=2.8.1",
@@ -69,7 +70,6 @@ docstring-code-format = true
 
 [dependency-groups]
 dev = [
-    "icecream>=2.1.4",
     "ipython>=9.1.0",
     "pre-commit>=4.2.0",
     "pyinstaller>=6.13.0",
