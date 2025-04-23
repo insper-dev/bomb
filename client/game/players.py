@@ -45,7 +45,7 @@ class Player:
         self.sprites_index: int = 0
 
         # Player transition velocity
-        self.velocity: int = 200
+        self.velocity: int = 300
 
         # Player animation deslocation
         self.ds = 0
