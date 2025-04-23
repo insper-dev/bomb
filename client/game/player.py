@@ -70,8 +70,8 @@ class Player:
 
     def render(self) -> None:
         """
-        Desenha o sprite do jogador na tela, usando
-        posição e direção obtidas do estado do servidor.
+        Desenha o sprite do jogador na tela e, se for o jogador local,
+        adiciona um feedback visual (contorno dourado).
         """
         ps = self.player_state
         if ps is None:
@@ -85,4 +85,12 @@ class Player:
         x_px = ps.x * MODULE_SIZE + self.margin[0]
         y_px = ps.y * MODULE_SIZE + self.margin[1]
 
+        # Blit do sprite
         self.app.screen.blit(sprite, (x_px, y_px))
+
+        # Se for o jogador local, desenha um contorno ao redor
+        current = self.app.auth_service.current_user
+        if current and current.id == self.player_id:
+            rect = sprite.get_rect(topleft=(x_px, y_px))
+            # cor dourada e espessura de 2 pixels
+            pygame.draw.rect(self.app.screen, (255, 215, 0), rect, width=2)
