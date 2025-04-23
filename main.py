@@ -1,10 +1,14 @@
 import argparse
 
+from icecream import ic
+
 from core.abstract import App
 from core.config import get_settings
 
 
 def main() -> None:
+    # TODO: desabilitar icecream de acordo com argumento CLI
+    ic.configureOutput(prefix="🍦 DEBUG | ")
     parser = argparse.ArgumentParser(description="Bomberman Online - Cliente/Servidor")
 
     parser.add_argument(
