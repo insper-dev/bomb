@@ -23,7 +23,7 @@ class InitialScene(BaseScene):
             Text(
                 self.app.screen,
                 position=(self.app.screen_center[0], title_y),
-                label="LaraBomb Online",
+                label="BombInsper Online",
                 text_type="title",
             ),
             Text(
