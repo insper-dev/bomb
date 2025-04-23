@@ -176,13 +176,13 @@ class GameState(BaseModel):
         self,
         player_id: str,
         bomb_id: str,
+        remove_bomb: bool = False,
     ) -> list[tuple[int, int]]:
         """
-        Marca a bomba como explodida, remove-a da lista do jogador, destrói
-        paredes quebráveis em cruz e retorna a lista de tiles afetados
+        Marca a bomba como explodida, opcionalmente remove-a da lista do jogador,
+        destrói paredes quebráveis em cruz e retorna a lista de tiles afetados
         (para facilitar detecção de jogadores atingidos).
         """
-        # TODO: mover a "remoção da bomba" para uma task async separada a fim de dar tempo de animar
         ic(f"Processing explosion: player={player_id}, bomb={bomb_id}")
 
         # 1) Encontra o estado da bomba
@@ -198,13 +198,15 @@ class GameState(BaseModel):
 
         ic(f"Found bomb at ({bomb.x}, {bomb.y}) with radius={bomb.radius}")
 
-        # 2) Marca timestamp de explosão
-        bomb.exploded_at = datetime.now()
+        # 2) Marca timestamp de explosão se ainda não estiver marcado
+        if not bomb.exploded_at:
+            bomb.exploded_at = datetime.now()
 
-        # 3) Remove da lista de bombas ativas
-        old_bomb_count = len(player.bombs)
-        player.bombs = [b for b in player.bombs if b.id != bomb_id]
-        ic(f"Removed bomb: {old_bomb_count} → {len(player.bombs)} bombs")
+        # 3) Remove da lista de bombas ativas se solicitado
+        if remove_bomb:
+            old_bomb_count = len(player.bombs)
+            player.bombs = [b for b in player.bombs if b.id != bomb_id]
+            ic(f"Removed bomb: {old_bomb_count} → {len(player.bombs)} bombs")
 
         # 4) Calcula alcance em cruz
         affected: list[tuple[int, int]] = [(bomb.x, bomb.y)]

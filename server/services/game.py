@@ -183,49 +183,58 @@ class GameService:
         delay: float,
     ) -> None:
         try:
+            # 1. Aguarda o delay inicial da bomba
             ic(f"Explosion countdown for bomb {bomb_id}: {delay}s")
-            # espera a contagem regressiva
             await asyncio.sleep(delay)
             game = self.games.get(game_id)
             if not game:
                 ic(f"Game {game_id} not found for explosion")
                 return
 
-            # Não é mais necessário passar o radius
-            affected_tiles = game.explode_bomb(owner_id, bomb_id)
+            # 2. Marca a explosão e calcula tiles afetados (sem remover a bomba ainda)
+            affected_tiles = game.explode_bomb(owner_id, bomb_id, remove_bomb=False)
             ic(
                 f"Bomb {bomb_id} exploded",
                 len(affected_tiles),
                 affected_tiles[:5] if affected_tiles else [],
             )
 
-            # Broadcast do novo mapa + remoção da bomba
+            # 3. Broadcast do estado com animação de explosão
             await self.broadcast_state(game_id)
 
-            # Verifica se algum player está em um dos tiles afetados
-            hits = [pid for pid, p in game.players.items() if (p.x, p.y) in affected_tiles]
-            ic("Players hit:", hits)
+            # 4. Aguarda tempo para a animação rodar
+            animation_delay = 0.8  # segundos
+            await asyncio.sleep(animation_delay)
 
-            # Só encerra o jogo se alguém foi atingido
-            if hits:
-                # vencedor é quem NÃO foi atingido (assumindo 2 jogadores)
-                survivors = [pid for pid in game.players if pid not in hits]
-                winner = survivors[0] if survivors else None
-                ic("Players hit:", hits, "Survivors:", survivors, "Winner:", winner)
-                game.end_game(winner)
+            # 5. Remove a bomba e atualiza estado final
+            if game := self.games.get(game_id):  # Re-fetch game to ensure it still exists
+                game.explode_bomb(owner_id, bomb_id, remove_bomb=True)
+                await self.broadcast_state(game_id)
 
-                # atualiza banco e notifica
-                if winner:  # Only declare a winner if one exists
-                    ic(f"Declaring winner: {winner}")
-                    task = asyncio.create_task(self._declare_winner(game_id, winner))
-                    self.winner_tasks.add(task)
-                    task.add_done_callback(self.winner_tasks.discard)
-                else:
-                    # If there are hits but no winner, it's a draw
-                    ic("Hits but no winner - finalizing as draw")
-                    task = asyncio.create_task(self._finalize_match(game_id))
-                    self.winner_tasks.add(task)
-                    task.add_done_callback(self.winner_tasks.discard)
+                # 6. Verifica hits e processa fim de jogo se necessário
+                hits = [pid for pid, p in game.players.items() if (p.x, p.y) in affected_tiles]
+                ic("Players hit:", hits)
+
+                # Só encerra o jogo se alguém foi atingido
+                if hits:
+                    # vencedor é quem NÃO foi atingido (assumindo 2 jogadores)
+                    survivors = [pid for pid in game.players if pid not in hits]
+                    winner = survivors[0] if survivors else None
+                    ic("Players hit:", hits, "Survivors:", survivors, "Winner:", winner)
+                    game.end_game(winner)
+
+                    # atualiza banco e notifica
+                    if winner:  # Only declare a winner if one exists
+                        ic(f"Declaring winner: {winner}")
+                        task = asyncio.create_task(self._declare_winner(game_id, winner))
+                        self.winner_tasks.add(task)
+                        task.add_done_callback(self.winner_tasks.discard)
+                    else:
+                        # If there are hits but no winner, it's a draw
+                        ic("Hits but no winner - finalizing as draw")
+                        task = asyncio.create_task(self._finalize_match(game_id))
+                        self.winner_tasks.add(task)
+                        task.add_done_callback(self.winner_tasks.discard)
 
             # Always broadcast state updates, but only continue game if no hits
             await self.broadcast_state(game_id)
