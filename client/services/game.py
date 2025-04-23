@@ -1,5 +1,4 @@
 import asyncio
-import json
 import threading
 from collections.abc import Callable
 
@@ -84,9 +83,7 @@ class GameService(ServiceBase):
 
         # Send to server
         ev = MovimentEvent(direction=direction)
-        asyncio.run_coroutine_threadsafe(
-            self.websocket.send(json.dumps(ev.model_dump())), self._loop
-        )
+        asyncio.run_coroutine_threadsafe(self.websocket.send(ev.model_dump_json()), self._loop)
 
     def send_bomb(self) -> None:
         """
@@ -128,8 +125,7 @@ class GameService(ServiceBase):
                 while self.running:
                     try:
                         raw = await ws.recv()
-                        data = json.loads(raw)
-                        self.state = GameState.model_validate(data)
+                        self.state = GameState.model_validate_json(raw)
                         # Detect end of game
                         if (
                             previous_status == GameStatus.PLAYING
