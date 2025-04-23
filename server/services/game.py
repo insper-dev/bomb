@@ -4,7 +4,7 @@ from datetime import datetime
 
 from fastapi import WebSocket
 from icecream import ic
-from prisma.models import Match, MatchPlayer
+from prisma.models import Match, MatchPlayer, User
 from prisma.types import MatchUpdateInput
 
 from core.models.game import BombState, GameState, GameStatus, PlayerState
@@ -30,19 +30,23 @@ class GameService:
         game_id = match.id
         ic(game_id)
 
+        players: list[User] = [
+            await User.prisma().find_unique(where={"id": pid}) for pid in player_ids
+        ]  # type: ignore [fé que o ID existe.]
+
         game = GameState(game_id=game_id)
         positions = [(1, 1), (len(game.map[0]) - 2, len(game.map) - 2)]
         ic(positions)
 
-        for i, pid in enumerate(player_ids):
+        for i, player in enumerate(players):
             x, y = positions[i] if i < len(positions) else (0, 0)
-            game.players[pid] = PlayerState(
-                username=pid,
+            game.players[player.id] = PlayerState(
+                username=player.username,
                 direction_state="stand_by",
                 x=x,
                 y=y,
             )
-            ic(pid, x, y)
+            ic(player, x, y)
 
         self.games[game_id] = game
         self.connections[game_id] = []

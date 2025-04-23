@@ -3,78 +3,92 @@ import pygame
 from client.game.player import Player
 from client.scenes.base import BaseScene, Scenes
 from client.services.game import GameService
-from core.constants import BLOCKS, BOMB_COKING, EXPLOSION_PARTICLES, MODULE_SIZE, PURPLE
+from core.constants import (
+    BLOCKS,
+    BOMB_COKING,
+    EXPLOSION_PARTICLES,
+    MODULE_SIZE,
+    PLAYERS_MAP,
+    PURPLE,
+)
 from core.models.game import UNDESTOYABLE_BOXES, GameState, GameStatus, MapBlockType
 
 
 class GameScene(BaseScene):
     """
-    Cena principal do jogo. Atualiza e renderiza o mapa,
-    jogadores, bombas e explosões conforme o estado vindo do servidor.
+    Cena principal: mapa + jogadores + bombas + explosões,
+    com HUD no topo mostrando quem está contra quem.
     """
+
+    HUD_HEIGHT = 50
 
     def __init__(self, app) -> None:
         super().__init__(app)
         self.service: GameService = app.game_service
         self.service.register_game_ended_callback(self._on_game_end)
 
-        # Espera até o primeiro estado chegar
+        # aguarda estado inicial
         while not self.service.state:
             pass
 
-        # Calcula margem para centralizar o mapa
+        # calcula margin incluindo HUD
         self._calc_margin(self.service.state)
 
-        # Instancia um Player para cada participante
+        # instancia players
         self.players = {
-            pid: Player(self.service, self.margim, pid) for pid in self.service.state.players
+            pid: Player(self.service, self.margin, pid) for pid in self.service.state.players
         }
 
     @property
     def state(self) -> GameState | None:
         return self.service.state
 
-    def _on_game_end(self, status: GameStatus, winner: str | None) -> None:
-        # No próximo render() será trocada a cena
-        ...
+    def _on_game_end(self, status: GameStatus, winner: str | None) -> None: ...
 
     def _calc_margin(self, state: GameState) -> None:
+        screen_w, screen_h = self.app.screen.get_size()
         w_tiles = len(state.map[0])
         h_tiles = len(state.map)
-        x = self.app.screen_center[0] - w_tiles * MODULE_SIZE // 2
-        y = self.app.screen_center[1] - h_tiles * MODULE_SIZE // 2
-        self.margim = (x, y)
+
+        total_map_h = h_tiles * MODULE_SIZE
+        x = (screen_w - w_tiles * MODULE_SIZE) // 2
+        # reserva HUD_HEIGHT no topo, depois centraliza abaixo
+        y = self.HUD_HEIGHT + (screen_h - self.HUD_HEIGHT - total_map_h) // 2
+
+        self.margin = (x, y)
 
     def handle_event(self, event) -> None:
-        # Encaminha apenas para o player local
         if event.type == pygame.KEYDOWN:
             user = self.app.auth_service.current_user
             if user and user.id in self.players:
                 self.players[user.id].handle_event(event)
-            # ESC ou ENTER retorna ao menu
             if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
                 self.service.stop()
                 self.app.current_scene = Scenes.START
 
     def render(self) -> None:
         screen = self.app.screen
+        screen_w, _ = screen.get_size()
         screen.fill(PURPLE)
 
         if not self.state:
             return
 
-        # Se o jogo acabou, muda de cena
+        # HUD no topo
+        self._draw_hud(screen, screen_w)
+
+        # se jogo terminou, troca de cena
         if self.state.status != GameStatus.PLAYING:
             self.service.stop()
             self.app.current_scene = Scenes.GAME_OVER
             return
 
-        # 1) Desenha o mapa
+        # 1) Desenha mapa
         for y, row in enumerate(self.state.map):
             for x, cell in enumerate(row):
                 rect = pygame.Rect(
-                    self.margim[0] + x * MODULE_SIZE,
-                    self.margim[1] + y * MODULE_SIZE,
+                    self.margin[0] + x * MODULE_SIZE,
+                    self.margin[1] + y * MODULE_SIZE,
                     MODULE_SIZE,
                     MODULE_SIZE,
                 )
@@ -82,106 +96,101 @@ class GameScene(BaseScene):
                 if sprite:
                     screen.blit(sprite, rect)
 
-        # 2) Grade opcional
-        for y in range(len(self.state.map) + 1):
+        # 2) Grade
+        rows, cols = len(self.state.map), len(self.state.map[0])
+        for i in range(rows + 1):
             pygame.draw.line(
                 screen,
                 (255, 255, 255),
-                (self.margim[0], self.margim[1] + y * MODULE_SIZE),
-                (
-                    self.margim[0] + len(self.state.map[0]) * MODULE_SIZE,
-                    self.margim[1] + y * MODULE_SIZE,
-                ),
+                (self.margin[0], self.margin[1] + i * MODULE_SIZE),
+                (self.margin[0] + cols * MODULE_SIZE, self.margin[1] + i * MODULE_SIZE),
             )
-        for x in range(len(self.state.map[0]) + 1):
+        for j in range(cols + 1):
             pygame.draw.line(
                 screen,
                 (255, 255, 255),
-                (self.margim[0] + x * MODULE_SIZE, self.margim[1]),
-                (
-                    self.margim[0] + x * MODULE_SIZE,
-                    self.margim[1] + len(self.state.map) * MODULE_SIZE,
-                ),
+                (self.margin[0] + j * MODULE_SIZE, self.margin[1]),
+                (self.margin[0] + j * MODULE_SIZE, self.margin[1] + rows * MODULE_SIZE),
             )
 
         # 3) Jogadores
         for player in self.players.values():
             player.render()
 
-        # 4) Bombas não explodidas (animação de cooking)
+        # 4) Bombas (cooking)
         for pstate in self.state.players.values():
             for bomb in pstate.bombs:
                 if bomb.exploded_at is None:
-                    # bomba ainda contando
-                    bx = self.margim[0] + bomb.x * MODULE_SIZE
-                    by = self.margim[1] + bomb.y * MODULE_SIZE
+                    bx = self.margin[0] + bomb.x * MODULE_SIZE
+                    by = self.margin[1] + bomb.y * MODULE_SIZE
                     frame = (pygame.time.get_ticks() // 200) % len(BOMB_COKING)
                     screen.blit(BOMB_COKING[frame], (bx, by))
 
-        # 5) Explosões (telegráfica em “cruz” com base em bomb.radius)
+        # 5) Explosões
         for pstate in self.state.players.values():
             for bomb in pstate.bombs:
                 if bomb.exploded_at:
-                    # centro da explosão
-                    cx = self.margim[0] + bomb.x * MODULE_SIZE
-                    cy = self.margim[1] + bomb.y * MODULE_SIZE
-                    # sprite central
+                    cx = self.margin[0] + bomb.x * MODULE_SIZE
+                    cy = self.margin[1] + bomb.y * MODULE_SIZE
                     screen.blit(EXPLOSION_PARTICLES["geo"][0], (cx, cy))
 
-                    # Direções e seus índices para rotação dos sprites
-                    directions = [(0, -1), (1, 0), (0, 1), (-1, 0)]  # up, right, down, left
-
-                    # Calcula os tiles afetados em cada direção uma vez só
-                    explosion_tiles = {i: [] for i in range(4)}
+                    directions = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+                    tiles_by_dir = {i: [] for i in range(4)}
                     for i, (dx, dy) in enumerate(directions):
-                        current_tiles = []
-
-                        # Percorre até o raio máximo ou encontrar obstáculo
                         for step in range(1, bomb.radius + 1):
-                            tx = bomb.x + dx * step
-                            ty = bomb.y + dy * step
-
-                            # Verifica limites e obstáculos
+                            tx, ty = bomb.x + dx * step, bomb.y + dy * step
                             if (
                                 tx < 0
                                 or ty < 0
-                                or ty >= len(self.state.map)
-                                or tx >= len(self.state.map[0])
+                                or ty >= rows
+                                or tx >= cols
+                                or self.state.map[ty][tx] in UNDESTOYABLE_BOXES
                             ):
                                 break
-
-                            if self.state.map[ty][tx] in UNDESTOYABLE_BOXES:
-                                break
-
-                            # Adiciona tile à lista desta direção
-                            current_tiles.append((tx, ty))
-
-                            # Para em blocos destrutíveis após incluí-los
+                            tiles_by_dir[i].append((tx, ty))
                             if self.state.map[ty][tx] in {
                                 MapBlockType.WOODEN_BOX,
                                 MapBlockType.SAND_BOX,
                             }:
                                 break
-
-                        # Armazena os tiles desta direção
-                        explosion_tiles[i] = current_tiles
-
-                    # Renderiza as explosões usando os tiles pré-calculados
-                    for direction_idx, tiles in explosion_tiles.items():
+                    for dir_idx, tiles in tiles_by_dir.items():
                         for tx, ty in tiles:
-                            px = self.margim[0] + tx * MODULE_SIZE
-                            py = self.margim[1] + ty * MODULE_SIZE
-
-                            # Check if this is the last tile in this direction
-                            is_last_tile = bool(tiles) and (tx, ty) == tiles[-1]
-
-                            # Choose and render the appropriate sprite
-                            if is_last_tile:
-                                # Último tile usa sprite de ponta na direção correta
-                                # Rotação: up=0, right=1, down=2, left=3
-                                sprite = EXPLOSION_PARTICLES["tip"][direction_idx]
-                            else:
-                                # Tiles intermediários usam sprite de cauda com mesma rotação
-                                sprite = EXPLOSION_PARTICLES["tail"][direction_idx]
-
+                            px = self.margin[0] + tx * MODULE_SIZE
+                            py = self.margin[1] + ty * MODULE_SIZE
+                            is_last = tiles and (tx, ty) == tiles[-1]
+                            part = "tip" if is_last else "tail"
+                            sprite = EXPLOSION_PARTICLES[part][dir_idx]
                             screen.blit(sprite, (px, py))
+
+    def _draw_hud(self, screen: pygame.Surface, screen_w: int) -> None:
+        """Desenha a barra superior com 'A vs B' e miniaturas."""
+        if not self.state:
+            return
+        # retângulo de fundo
+        hud_rect = pygame.Rect(0, 0, screen_w, self.HUD_HEIGHT)
+        pygame.draw.rect(screen, (30, 30, 30), hud_rect)
+
+        # extrai os dois primeiros jogadores
+        pids = list(self.state.players.keys())
+        if len(pids) >= 2:
+            a, b = self.state.players[pids[0]], self.state.players[pids[1]]
+        else:
+            return
+
+        # texto central
+        font = pygame.font.SysFont(None, 24)
+        vs_text = f"{a.username}  vs  {b.username}"
+        text_surf = font.render(vs_text, True, (255, 255, 255))
+        txt_x = (screen_w - text_surf.get_width()) // 2
+        txt_y = (self.HUD_HEIGHT - text_surf.get_height()) // 2
+        screen.blit(text_surf, (txt_x, txt_y))
+
+        # miniaturas (32x32)
+        def draw_thumb(ps, x_pos) -> None:
+            frames = PLAYERS_MAP[ps.skin]["down"]  # quadro neutro
+            thumb = pygame.transform.scale(frames[0], (32, 32))
+            y_pos = (self.HUD_HEIGHT - 32) // 2
+            screen.blit(thumb, (x_pos, y_pos))
+
+        draw_thumb(a, 10)
+        draw_thumb(b, screen_w - 10 - 32)
