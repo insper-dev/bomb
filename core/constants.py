@@ -34,6 +34,7 @@ SESSION_FILE = ROOT / ".session.json"
 
 # Color constants
 PURPLE = pygame.Color(1, 5, 68)
+EARTH = pygame.Color(160, 120, 80)  # Sandy brown color for background
 ROSE = pygame.Color(243, 45, 107)
 WHITE = pygame.Color(255, 255, 255)
 WHITE_GRAY = pygame.Color(200, 200, 200)

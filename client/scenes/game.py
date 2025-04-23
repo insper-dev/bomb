@@ -3,14 +3,7 @@ import pygame
 from client.game.player import Player
 from client.scenes.base import BaseScene, Scenes
 from client.services.game import GameService
-from core.constants import (
-    BLOCKS,
-    BOMB_COKING,
-    EXPLOSION_PARTICLES,
-    MODULE_SIZE,
-    PLAYERS_MAP,
-    PURPLE,
-)
+from core.constants import BLOCKS, BOMB_COKING, EARTH, EXPLOSION_PARTICLES, MODULE_SIZE, PLAYERS_MAP
 from core.models.game import UNDESTOYABLE_BOXES, GameState, GameStatus, MapBlockType
 
 
@@ -69,7 +62,7 @@ class GameScene(BaseScene):
     def render(self) -> None:
         screen = self.app.screen
         screen_w, _ = screen.get_size()
-        screen.fill(PURPLE)
+        screen.fill(EARTH)
 
         if not self.state:
             return
