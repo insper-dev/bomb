@@ -13,7 +13,7 @@ class MainMenuScene(BaseScene):
             Text(
                 self.app.screen,
                 position=(self.app.screen_center[0], int(self.app.screen_center[1] * 0.6)),
-                label="Lara Bomb Online",
+                label="BombInsper Online",
                 variant="standard",
                 size="lg",
                 text_type="title",

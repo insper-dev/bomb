@@ -27,9 +27,9 @@ class ServerApp(App):
         super().__init__(settings)
 
         self.app = FastAPI(
-            title="Lara Bomb Online Server",
-            description="Server for Lara Bomb Online",
-            version="0.1.0",
+            title="BombInsper Online Server",
+            description="Server for BombInsper Online",
+            version="1.0.0",
             docs_url="/docs" if settings.server_debug else None,
             redoc_url="/redoc" if settings.server_debug else None,
             lifespan=lifespan,
