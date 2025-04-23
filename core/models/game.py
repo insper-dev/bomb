@@ -35,12 +35,12 @@ class BombState(BaseModel):
     placed_at: datetime = Field(default_factory=datetime.now)
     exploded_at: datetime | None = None
 
-    @field_validator("placed_at", mode="before")
+    @field_validator("placed_at", "exploded_at", mode="before")
     @classmethod
     def validate_placed_at(cls, value) -> datetime:
         return value if value else datetime.fromisoformat(value)
 
-    @field_serializer("exploded_at")
+    @field_serializer("placed_at", "exploded_at")
     def serialize_exploded_at(self, value) -> str | None:
         return value.isoformat() if value else None
 
@@ -89,11 +89,11 @@ def generate_map() -> list[list[MapBlockType]]:
     map_grid[height - 1][width - 2] = MapBlockType.EMPTY
     map_grid[height - 2][width - 1] = MapBlockType.EMPTY
 
-    # Occasionally place power-ups (5% chance in destructible boxes)
-    for y in range(height):
-        for x in range(width):
-            if map_grid[y][x] in DESTROYABLE_BOXES and random.random() < 0.05:
-                map_grid[y][x] = MapBlockType.POWER_UP
+    # # Occasionally place power-ups (5% chance in destructible boxes)
+    # for y in range(height):
+    #     for x in range(width):
+    #         if map_grid[y][x] in DESTROYABLE_BOXES and random.random() < 0.05:
+    #             map_grid[y][x] = MapBlockType.POWER_UP
 
     return map_grid
 
