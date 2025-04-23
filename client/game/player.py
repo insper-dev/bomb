@@ -86,7 +86,7 @@ class Player:
             "right": lambda x, y: (x + walked_distance, y),
         }
         fn = move_map[self.current_player_state.direction_state]
-        self.__real_position = fn(self.__real_position)
+        self.__real_position = fn(*self.__real_position)
 
         return self.__real_position
 
