@@ -155,9 +155,4 @@ class BaseComponent(ABC):
         """
         self._render()
         self.surface = self._init_surface()
-        self.rect = (
-            self.surface.get_rect(topleft=(self.position))
-            if self.is_topleft
-            else self.surface.get_rect(center=(self.position))
-        )
         self.window.blit(self.surface, self.rect)
