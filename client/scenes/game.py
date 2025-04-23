@@ -17,17 +17,23 @@ class GameScene(BaseScene):
         self.match_id: str = app.matchmaking_service.match_id or ""
         self.service.register_game_ended_callback(self._on_game_end)
 
-        self.state: GameState | None = None
-
         # Initiate margin
         self.margim: tuple[int, int]
 
         # Initiate players hehe
         self.players: dict[str, Player]
+        while not self.service.state:
+            pass
+
+        self._calc_margin(self.service.state)
+        self._init_players(self.service.state)
 
         # Initiate bombs kaboom
         self.bombs: list[Bomb] = []
-        print("GameScene.__init__ completed")
+
+    @property
+    def state(self) -> GameState | None:
+        return self.service.state
 
     def _on_game_end(self, status: GameStatus, winner: str | None) -> None:
         # TODO: mover pra cena de game over
@@ -43,12 +49,14 @@ class GameScene(BaseScene):
             print("WARNING: state.map is None in _calc_margin")
             return
 
-        y = self.app.screen_center[0] - len(state.map) * MODULE_SIZE // 2
-        x = self.app.screen_center[1] - len(state.map[0]) * MODULE_SIZE // 2
+        x = self.app.screen_center[0] - len(state.map) * MODULE_SIZE // 2
+        y = self.app.screen_center[1] - len(state.map[0]) * MODULE_SIZE // 2
         self.margim = (x, y)
 
-    def handle_event(self, event: pygame.event.Event) -> None:
-        # Exit to menu
+    def handle_event(self, event) -> None:
+        if self.state is None:
+            return
+
         if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
             print("Exit key pressed, stopping service and returning to START scene")
             self.service.stop()
@@ -58,26 +66,9 @@ class GameScene(BaseScene):
         # TODO: instancia de player
         state = self.service.state
         user = self.app.auth_service.current_user
-        print(f"handle_event: state exists: {state is not None}, user exists: {user is not None}")
         if state is not None and user is not None:
-            for id, player in self.players.items():
-                if id == user.id:
-                    print(f"Passing event to player {id}")
-                    player.handle_event(event)
-
-        # TODO: passar o evento para o player
-        # Movement keys
-
-    def update(self) -> None:
-        # Update latest state
-        self.state = self.service.state
-        if self.state is None:
-            return
-
-        self._calc_margin(self.state)
-        self._init_players(self.state)
-
-        super().update()
+            player = self.players[user.id]
+            player.handle_event(event)
 
     def render(self) -> None:
         screen = self.app.screen
