@@ -370,7 +370,7 @@ wheels = [
 ]
 
 [[package]]
-name = "lara-bomb"
+name = "bomb-insper"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

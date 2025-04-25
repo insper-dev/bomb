@@ -1,4 +1,4 @@
-name: Build & Release lara-bomb
+name: Build & Release bomb
 
 on:
   push:
@@ -27,13 +27,13 @@ jobs:
 
       - name: Compilar com PyInstaller
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name lara-bomb --add-data "client\assets;client\assets" main.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name bomb --add-data "client\assets;client\assets" main.py
 
       - name: Publicar artefato Windows
         uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: dist/lara-bomb.exe
+          path: dist/bomb.exe
 
   build-linux:
     name: Build para Linux
@@ -63,7 +63,7 @@ jobs:
             --noconfirm --clean \
             --onefile \
             --windowed \
-            --name lara-bomb-linux \
+            --name bomb-linux \
             --add-data "client/assets:client/assets" \
             main.py
 
@@ -71,7 +71,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux
-          path: dist/lara-bomb-linux
+          path: dist/bomb-linux
 
   build-macos:
     name: Build para macOS
@@ -98,7 +98,7 @@ jobs:
             --noconfirm --clean \
             --onefile \
             --windowed \
-            --name lara-bomb-macos \
+            --name bomb-macos \
             --add-data "client/assets:client/assets" \
             main.py
 
@@ -106,7 +106,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos
-          path: dist/lara-bomb-macos
+          path: dist/bomb-macos
 
   release:
     name: Criar Release no GitHub
@@ -138,6 +138,6 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: |
-            dist/lara-bomb.exe
-            dist/lara-bomb-linux
-            dist/lara-bomb-macos
+            dist/bomb.exe
+            dist/bomb-linux
+            dist/bomb-macos

@@ -1,5 +1,5 @@
 [project]
-name = "lara-bomb"
+name = "bomb-insper"
 version = "0.1.0"
 description = "A bomberman-like online game"
 readme = "README.md"
