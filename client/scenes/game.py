@@ -3,7 +3,24 @@ import pygame
 from client.game.player import Player
 from client.scenes.base import BaseScene, Scenes
 from client.services.game import GameService
-from core.constants import BLOCKS, BOMB_COKING, EARTH, EXPLOSION_PARTICLES, MODULE_SIZE, PLAYERS_MAP
+from core.constants import (
+    ACCENT_BLUE,
+    ACCENT_GREEN,
+    ACCENT_RED,
+    ACCENT_YELLOW,
+    BLOCKS,
+    BOMB_COKING,
+    BOMB_TIMER_RED,
+    DARK_NAVY,
+    EARTH,
+    EXPLOSION_ORANGE,
+    EXPLOSION_PARTICLES,
+    LIGHT_GRAY,
+    MODULE_SIZE,
+    PLAYERS_MAP,
+    SLATE_GRAY,
+    WHITE,
+)
 from core.models.game import UNDESTOYABLE_BOXES, GameState, GameStatus, MapBlockType
 
 
@@ -31,6 +48,15 @@ class GameScene(BaseScene):
         self.players = {
             pid: Player(self.service, self.margin, pid) for pid in self.service.state.players
         }
+
+        # Cache para otimização de renderização
+        self._map_cache = None
+        self._grid_cache = None
+        self._need_map_refresh = True
+
+        # FPS counter para debug
+        self.fps_font = pygame.font.SysFont("Arial", 16)
+        self.show_fps = True
 
     @property
     def state(self) -> GameState | None:
@@ -61,14 +87,16 @@ class GameScene(BaseScene):
 
     def render(self) -> None:
         screen = self.app.screen
-        screen_w, _ = screen.get_size()
-        screen.fill(EARTH)
+        screen_w, screen_h = screen.get_size()
+
+        # Background gradiente moderno
+        self._render_gradient_background(screen, screen_w, screen_h)
 
         if not self.state:
             return
 
-        # HUD no topo
-        self._draw_hud(screen, screen_w)
+        # HUD melhorado
+        self._draw_modern_hud(screen, screen_w)
 
         # se jogo terminou, troca de cena
         if self.state.status != GameStatus.PLAYING:
@@ -76,55 +104,145 @@ class GameScene(BaseScene):
             self.app.current_scene = Scenes.GAME_OVER
             return
 
-        # 1) Desenha mapa
-        for y, row in enumerate(self.state.map):
-            for x, cell in enumerate(row):
-                rect = pygame.Rect(
-                    self.margin[0] + x * MODULE_SIZE,
-                    self.margin[1] + y * MODULE_SIZE,
-                    MODULE_SIZE,
-                    MODULE_SIZE,
-                )
-                sprite = BLOCKS.get(cell)
-                if sprite:
-                    screen.blit(sprite, rect)
+        # 1) Mapa com cache otimizado
+        self._render_map_optimized(screen)
 
-        # 2) Grade
-        rows, cols = len(self.state.map), len(self.state.map[0])
-        for i in range(rows + 1):
-            pygame.draw.line(
-                screen,
-                (255, 255, 255),
-                (self.margin[0], self.margin[1] + i * MODULE_SIZE),
-                (self.margin[0] + cols * MODULE_SIZE, self.margin[1] + i * MODULE_SIZE),
-            )
-        for j in range(cols + 1):
-            pygame.draw.line(
-                screen,
-                (255, 255, 255),
-                (self.margin[0] + j * MODULE_SIZE, self.margin[1]),
-                (self.margin[0] + j * MODULE_SIZE, self.margin[1] + rows * MODULE_SIZE),
-            )
+        # 2) Grade sutil
+        self._render_subtle_grid(screen)
 
-        # 3) Jogadores
+        # 3) Jogadores com interpolação
         for player in self.players.values():
+            player.update()
             player.render()
 
-        # 4) Bombas (cooking)
+        # 4) Bombas com efeitos melhorados
+        self._render_bombs_enhanced(screen)
+
+        # 5) Explosões com partículas melhoradas
+        self._render_explosions_enhanced(screen)
+
+        # 6) FPS counter (debug)
+        if self.show_fps:
+            self._render_fps(screen)
+
+    def _render_gradient_background(self, screen: pygame.Surface, w: int, h: int) -> None:
+        """Renderiza background com gradiente moderno."""
+        # Gradiente simples de cima para baixo
+        for y in range(h):
+            ratio = y / h
+            r = int(DARK_NAVY.r + (EARTH.r - DARK_NAVY.r) * ratio)
+            g = int(DARK_NAVY.g + (EARTH.g - DARK_NAVY.g) * ratio)
+            b = int(DARK_NAVY.b + (EARTH.b - DARK_NAVY.b) * ratio)
+            pygame.draw.line(screen, (r, g, b), (0, y), (w, y))
+
+    def _render_map_optimized(self, screen: pygame.Surface) -> None:
+        """Renderização otimizada do mapa com cache."""
+        if self._need_map_refresh or not self._map_cache:
+            self._build_map_cache()
+            self._need_map_refresh = False
+
+        if self._map_cache:
+            screen.blit(self._map_cache, self.margin)
+
+    def _build_map_cache(self) -> None:
+        """Constrói cache do mapa para melhor performance."""
+        if not self.state:
+            return
+
+        rows, cols = len(self.state.map), len(self.state.map[0])
+        cache_surface = pygame.Surface((cols * MODULE_SIZE, rows * MODULE_SIZE))
+
+        for y, row in enumerate(self.state.map):
+            for x, cell in enumerate(row):
+                rect = pygame.Rect(x * MODULE_SIZE, y * MODULE_SIZE, MODULE_SIZE, MODULE_SIZE)
+                sprite = BLOCKS.get(cell)
+                if sprite:
+                    cache_surface.blit(sprite, rect)
+
+        self._map_cache = cache_surface
+
+    def _render_subtle_grid(self, screen: pygame.Surface) -> None:
+        """Grade sutil e moderna."""
+        if not self.state:
+            return
+
+        rows, cols = len(self.state.map), len(self.state.map[0])
+        grid_color = (*SLATE_GRAY[:3], 60)  # Semi-transparente
+
+        # Linhas horizontais
+        for i in range(rows + 1):
+            y = self.margin[1] + i * MODULE_SIZE
+            pygame.draw.line(
+                screen, grid_color, (self.margin[0], y), (self.margin[0] + cols * MODULE_SIZE, y), 1
+            )
+
+        # Linhas verticais
+        for j in range(cols + 1):
+            x = self.margin[0] + j * MODULE_SIZE
+            pygame.draw.line(
+                screen, grid_color, (x, self.margin[1]), (x, self.margin[1] + rows * MODULE_SIZE), 1
+            )
+
+    def _render_bombs_enhanced(self, screen: pygame.Surface) -> None:
+        """Bombas com efeitos visuais melhorados."""
+        current_time = pygame.time.get_ticks()
+
         for pstate in self.state.players.values():
             for bomb in pstate.bombs:
                 if bomb.exploded_at is None:
                     bx = self.margin[0] + bomb.x * MODULE_SIZE
                     by = self.margin[1] + bomb.y * MODULE_SIZE
-                    frame = (pygame.time.get_ticks() // 200) % len(BOMB_COKING)
+
+                    # Frame animado mais rápido quando próximo da explosão
+                    time_factor = 100 if current_time % 1000 > 800 else 200
+                    frame = (current_time // time_factor) % len(BOMB_COKING)
+
+                    # Efeito de pulsação
+                    if current_time % 1000 > 800:  # Últimos 200ms
+                        pulse = abs((current_time % 200) - 100) / 100.0
+                        glow_radius = int(MODULE_SIZE / 2 + pulse * 10)
+                        glow_surface = pygame.Surface(
+                            (glow_radius * 2, glow_radius * 2), pygame.SRCALPHA
+                        )
+                        pygame.draw.circle(
+                            glow_surface,
+                            (*BOMB_TIMER_RED[:3], 80),
+                            (glow_radius, glow_radius),
+                            glow_radius,
+                        )
+                        screen.blit(
+                            glow_surface,
+                            (
+                                bx + MODULE_SIZE // 2 - glow_radius,
+                                by + MODULE_SIZE // 2 - glow_radius,
+                            ),
+                        )
+
                     screen.blit(BOMB_COKING[frame], (bx, by))
 
-        # 5) Explosões
+    def _render_explosions_enhanced(self, screen: pygame.Surface) -> None:
+        """Explosões com efeitos de partículas melhorados."""
+        if not self.state:
+            return
+
+        rows, cols = len(self.state.map), len(self.state.map[0])
+
         for pstate in self.state.players.values():
             for bomb in pstate.bombs:
                 if bomb.exploded_at:
                     cx = self.margin[0] + bomb.x * MODULE_SIZE
                     cy = self.margin[1] + bomb.y * MODULE_SIZE
+
+                    # Centro da explosão com glow
+                    glow_size = MODULE_SIZE + 20
+                    glow_surface = pygame.Surface((glow_size, glow_size), pygame.SRCALPHA)
+                    pygame.draw.circle(
+                        glow_surface,
+                        (*EXPLOSION_ORANGE[:3], 150),
+                        (glow_size // 2, glow_size // 2),
+                        glow_size // 2,
+                    )
+                    screen.blit(glow_surface, (cx - 10, cy - 10))
                     screen.blit(EXPLOSION_PARTICLES["geo"][0], (cx, cy))
 
                     directions = [(0, -1), (1, 0), (0, 1), (-1, 0)]
@@ -146,50 +264,148 @@ class GameScene(BaseScene):
                                 MapBlockType.SAND_BOX,
                             }:
                                 break
+
                     for dir_idx, tiles in tiles_by_dir.items():
                         for tx, ty in tiles:
                             px = self.margin[0] + tx * MODULE_SIZE
                             py = self.margin[1] + ty * MODULE_SIZE
                             is_last = tiles and (tx, ty) == tiles[-1]
                             part = "tip" if is_last else "tail"
-                            # Fix for inverted left/right directions
+
+                            # Fix direções
                             fixed_dir_idx = dir_idx
                             if dir_idx == 1:
                                 fixed_dir_idx = 3
                             elif dir_idx == 3:
                                 fixed_dir_idx = 1
+
+                            # Glow para explosão
+                            glow_surface = pygame.Surface(
+                                (MODULE_SIZE + 10, MODULE_SIZE + 10), pygame.SRCALPHA
+                            )
+                            pygame.draw.circle(
+                                glow_surface,
+                                (*EXPLOSION_ORANGE[:3], 100),
+                                (MODULE_SIZE // 2 + 5, MODULE_SIZE // 2 + 5),
+                                MODULE_SIZE // 2 + 5,
+                            )
+                            screen.blit(glow_surface, (px - 5, py - 5))
+
                             sprite = EXPLOSION_PARTICLES[part][fixed_dir_idx]
                             screen.blit(sprite, (px, py))
 
-    def _draw_hud(self, screen: pygame.Surface, screen_w: int) -> None:
-        """Desenha a barra superior com 'A vs B' e miniaturas."""
+    def _render_fps(self, screen: pygame.Surface) -> None:
+        """Contador de FPS e informações de rede."""
+        fps = int(self.app.clock.get_fps())
+        fps_color = ACCENT_GREEN if fps >= 50 else ACCENT_YELLOW if fps >= 30 else ACCENT_RED
+        fps_text = self.fps_font.render(f"FPS: {fps}", True, fps_color)
+        screen.blit(fps_text, (10, 10))
+
+        # Indicador de latência
+        latency = self.service.latency
+        quality = self.service.connection_quality
+
+        # Cor baseada na qualidade
+        if quality == "Excelente":
+            latency_color = ACCENT_GREEN
+        elif quality == "Boa":
+            latency_color = ACCENT_BLUE
+        elif quality == "Regular":
+            latency_color = ACCENT_YELLOW
+        else:
+            latency_color = ACCENT_RED
+
+        latency_text = self.fps_font.render(
+            f"Ping: {latency:.0f}ms ({quality})", True, latency_color
+        )
+        screen.blit(latency_text, (10, 30))
+
+    def _draw_modern_hud(self, screen: pygame.Surface, screen_w: int) -> None:
+        """HUD moderno e elegante."""
         if not self.state:
             return
-        # retângulo de fundo
-        hud_rect = pygame.Rect(0, 0, screen_w, self.HUD_HEIGHT)
-        pygame.draw.rect(screen, (30, 30, 30), hud_rect)
 
-        # extrai os dois primeiros jogadores
+        # Background com gradiente
+        hud_rect = pygame.Rect(0, 0, screen_w, self.HUD_HEIGHT)  # noqa: F841
+        for y in range(self.HUD_HEIGHT):
+            ratio = y / self.HUD_HEIGHT
+            r = int(DARK_NAVY.r + (SLATE_GRAY.r - DARK_NAVY.r) * ratio)
+            g = int(DARK_NAVY.g + (SLATE_GRAY.g - DARK_NAVY.g) * ratio)
+            b = int(DARK_NAVY.b + (SLATE_GRAY.b - DARK_NAVY.b) * ratio)
+            pygame.draw.line(screen, (r, g, b), (0, y), (screen_w, y))
+
+        # Borda inferior sutil
+        pygame.draw.line(
+            screen, ACCENT_BLUE, (0, self.HUD_HEIGHT - 1), (screen_w, self.HUD_HEIGHT - 1), 2
+        )
+
+        # Informações dos jogadores
         pids = list(self.state.players.keys())
         if len(pids) >= 2:
             a, b = self.state.players[pids[0]], self.state.players[pids[1]]
         else:
             return
 
-        # texto central
-        font = pygame.font.SysFont(None, 24)
-        vs_text = f"{a.username}  vs  {b.username}"
-        text_surf = font.render(vs_text, True, (255, 255, 255))
-        txt_x = (screen_w - text_surf.get_width()) // 2
-        txt_y = (self.HUD_HEIGHT - text_surf.get_height()) // 2
-        screen.blit(text_surf, (txt_x, txt_y))
+        # Fontes modernas
+        font_title = pygame.font.SysFont("Arial", 20, bold=True)
+        font_info = pygame.font.SysFont("Arial", 14)
 
-        # miniaturas (32x32)
-        def draw_thumb(ps, x_pos) -> None:
-            frames = PLAYERS_MAP[ps.skin]["down"]  # quadro neutro
-            thumb = pygame.transform.scale(frames[0], (32, 32))
-            y_pos = (self.HUD_HEIGHT - 32) // 2
-            screen.blit(thumb, (x_pos, y_pos))
+        # Player A (esquerda)
+        self._draw_player_info(screen, a, 20, font_title, font_info, True)
 
-        draw_thumb(a, 10)
-        draw_thumb(b, screen_w - 10 - 32)
+        # VS central com estilo
+        vs_text = font_title.render("VS", True, ACCENT_BLUE)
+        vs_x = (screen_w - vs_text.get_width()) // 2
+        vs_y = (self.HUD_HEIGHT - vs_text.get_height()) // 2
+
+        # Glow para o VS
+        glow_surface = pygame.Surface(
+            (vs_text.get_width() + 20, vs_text.get_height() + 10), pygame.SRCALPHA
+        )
+        pygame.draw.ellipse(glow_surface, (*ACCENT_BLUE[:3], 30), glow_surface.get_rect())
+        screen.blit(glow_surface, (vs_x - 10, vs_y - 5))
+        screen.blit(vs_text, (vs_x, vs_y))
+
+        # Player B (direita)
+        self._draw_player_info(screen, b, screen_w - 150, font_title, font_info, False)
+
+    def _draw_player_info(
+        self,
+        screen: pygame.Surface,
+        player,
+        x_pos: int,
+        font_title: pygame.font.Font,
+        font_info: pygame.font.Font,
+        is_left: bool,
+    ) -> None:
+        """Desenha informações de um jogador no HUD."""
+        # Miniatura do jogador
+        frames = PLAYERS_MAP[player.skin]["down"]
+        thumb = pygame.transform.scale(frames[0], (32, 32))
+        thumb_y = (self.HUD_HEIGHT - 32) // 2
+
+        if is_left:
+            screen.blit(thumb, (x_pos, thumb_y))
+            text_x = x_pos + 40
+        else:
+            screen.blit(thumb, (x_pos + 90, thumb_y))
+            text_x = x_pos
+
+        # Nome do jogador
+        name_text = font_title.render(player.username, True, WHITE)
+        if not is_left:  # Alinha à direita se for player B
+            text_x = x_pos + 90 - name_text.get_width()
+        screen.blit(name_text, (text_x, 8))
+
+        # Informações adicionais (bombas, posição, etc.)
+        bombs_count = len(player.bombs)
+        info_text = f"Bombas: {bombs_count} | Pos: ({player.x},{player.y})"
+        info_surface = font_info.render(info_text, True, LIGHT_GRAY)
+        if not is_left:
+            text_x = x_pos + 90 - info_surface.get_width()
+        screen.blit(info_surface, (text_x, 28))
+
+    # Mantém método antigo para compatibilidade
+    def _draw_hud(self, screen: pygame.Surface, screen_w: int) -> None:
+        """Método legado - agora chama o moderno."""
+        self._draw_modern_hud(screen, screen_w)

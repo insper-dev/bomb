@@ -32,18 +32,35 @@ SESSION_FILE = ROOT / ".session.json"
 
 # Constants for the game
 
-# Color constants
-PURPLE = pygame.Color(1, 5, 68)
-EARTH = pygame.Color(160, 120, 80)  # Sandy brown color for background
-ROSE = pygame.Color(243, 45, 107)
-WHITE = pygame.Color(255, 255, 255)
-WHITE_GRAY = pygame.Color(200, 200, 200)
-SOUTH_GRAY = pygame.Color(180, 180, 180)
-GRAY = pygame.Color(128, 128, 128)
-BLACK = pygame.Color(0, 0, 0)
-YELLOW = pygame.Color(243, 255, 107)
-BLUE = pygame.Color(0, 0, 255)
-GREEN = pygame.Color(0, 255, 0)
+# Modern Color Palette - Identidade Visual Melhorada
+DARK_NAVY = pygame.Color(15, 23, 42)  # Background principal
+SLATE_GRAY = pygame.Color(51, 65, 85)  # Elementos secundários
+ACCENT_BLUE = pygame.Color(59, 130, 246)  # Destaque principal
+ACCENT_GREEN = pygame.Color(34, 197, 94)  # Sucesso/confirmação
+ACCENT_RED = pygame.Color(239, 68, 68)  # Erro/perigo
+ACCENT_YELLOW = pygame.Color(251, 191, 36)  # Aviso/atenção
+ACCENT_PURPLE = pygame.Color(147, 51, 234)  # Especial
+
+# UI Colors
+WHITE = pygame.Color(248, 250, 252)  # Texto principal
+LIGHT_GRAY = pygame.Color(203, 213, 225)  # Texto secundário
+MEDIUM_GRAY = pygame.Color(100, 116, 139)  # Texto desabilitado
+BLACK = pygame.Color(2, 6, 23)  # Texto sobre fundos claros
+
+# Game Colors
+EARTH = pygame.Color(92, 77, 65)  # Fundo do mapa - terra mais escura
+EXPLOSION_ORANGE = pygame.Color(251, 146, 60)  # Explosões
+BOMB_TIMER_RED = pygame.Color(220, 38, 127)  # Timer das bombas
+
+# Legacy colors para compatibilidade
+PURPLE = DARK_NAVY
+ROSE = ACCENT_RED
+WHITE_GRAY = LIGHT_GRAY
+SOUTH_GRAY = MEDIUM_GRAY
+GRAY = MEDIUM_GRAY
+YELLOW = ACCENT_YELLOW
+BLUE = ACCENT_BLUE
+GREEN = ACCENT_GREEN
 
 
 # Constants for the components
