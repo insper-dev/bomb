@@ -39,7 +39,13 @@ class GameScene(BaseScene):
 
         # aguarda estado inicial
         while not self.service.state:
-            pass
+            # Adiciona uma pequena pausa para evitar consumo excessivo de CPU
+            pygame.time.wait(10)
+            # Processa eventos básicos para evitar travamento da janela
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.app.running = False
+                    return
 
         # calcula margin incluindo HUD
         self._calc_margin(self.service.state)
@@ -54,9 +60,22 @@ class GameScene(BaseScene):
         self._grid_cache = None
         self._need_map_refresh = True
 
+        # Sistema de detecção de mudanças para sincronização
+        self._last_state_bomb_count = 0
+        self._last_state_hash = ""
+        self._last_explosion_count = 0
+
+        # Cache de assets para performance
+        self._assets_cache = {}
+        self._precache_assets()
+
         # FPS counter para debug
         self.fps_font = pygame.font.SysFont("Arial", 16)
         self.show_fps = True
+
+        # Dirty rectangles para renderização otimizada
+        self._dirty_rects = []
+        self._last_rendered_positions = {}
 
     @property
     def state(self) -> GameState | None:
@@ -94,6 +113,9 @@ class GameScene(BaseScene):
 
         if not self.state:
             return
+
+        # --- DETECÇÃO DE MUDANÇAS CRÍTICAS PARA SINCRONIZAÇÃO ---
+        self._detect_state_changes()
 
         # HUD melhorado
         self._draw_modern_hud(screen, screen_w)
@@ -295,7 +317,7 @@ class GameScene(BaseScene):
                             screen.blit(sprite, (px, py))
 
     def _render_fps(self, screen: pygame.Surface) -> None:
-        """Contador de FPS e informações de rede."""
+        """Contador de FPS avançado com métricas detalhadas."""
         fps = int(self.app.clock.get_fps())
         fps_color = ACCENT_GREEN if fps >= 50 else ACCENT_YELLOW if fps >= 30 else ACCENT_RED
         fps_text = self.fps_font.render(f"FPS: {fps}", True, fps_color)
@@ -404,6 +426,62 @@ class GameScene(BaseScene):
         if not is_left:
             text_x = x_pos + 90 - info_surface.get_width()
         screen.blit(info_surface, (text_x, 28))
+
+    def _detect_state_changes(self) -> None:
+        """
+        Sistema crítico de detecção de mudanças para sincronização.
+        Resolve o bug principal onde blocos destruídos não são atualizados visualmente.
+        """
+        if not self.state:
+            return
+
+        # 1. Detecta mudanças no número de bombas (colocação ou explosão)
+        current_bomb_count = sum(len(p.bombs) for p in self.state.players.values())
+        if current_bomb_count != self._last_state_bomb_count:
+            self._need_map_refresh = True
+            self._last_state_bomb_count = current_bomb_count
+
+        # 2. Detecta explosões ativas (força atualização do mapa)
+        explosion_count = 0
+        for player in self.state.players.values():
+            for bomb in player.bombs:
+                if bomb.exploded_at is not None:
+                    explosion_count += 1
+
+        if explosion_count != self._last_explosion_count:
+            # CRÍTICO: Explosões sempre invalidam o cache do mapa
+            self._need_map_refresh = True
+            self._last_explosion_count = explosion_count
+
+        # 3. Hash do estado do mapa para detecção de mudanças finas
+        import hashlib
+
+        map_str = str(self.state.map)
+        current_hash = hashlib.md5(map_str.encode()).hexdigest()
+        if current_hash != self._last_state_hash:
+            self._need_map_refresh = True
+            self._last_state_hash = current_hash
+
+    def _precache_assets(self) -> None:
+        """Pré-carrega e cacheia assets para melhor performance."""
+        # Cache de explosões em diferentes tamanhos
+        for size in [MODULE_SIZE, MODULE_SIZE * 2]:
+            for name, anim in EXPLOSION_PARTICLES.items():
+                cache_key = f"explosion_{name}_{size}"
+                self._assets_cache[cache_key] = [
+                    pygame.transform.scale(frame, (size, size)) for frame in anim
+                ]
+
+        # Cache de efeitos de glow pré-renderizados
+        for radius in [20, 30, 40, 50]:
+            glow_surface = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
+            pygame.draw.circle(
+                glow_surface,
+                (*EXPLOSION_ORANGE[:3], 100),
+                (radius, radius),
+                radius,
+            )
+            self._assets_cache[f"glow_{radius}"] = glow_surface
 
     # Mantém método antigo para compatibilidade
     def _draw_hud(self, screen: pygame.Surface, screen_w: int) -> None:

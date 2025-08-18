@@ -8,6 +8,7 @@ from prisma.models import Match, MatchPlayer, User
 from prisma.types import MatchUpdateInput
 
 from core.models.game import BombState, GameState, GameStatus, PlayerState
+from server.utils.compression import compress_game_state, get_state_hash
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,9 @@ class GameService:
         self.game_timers: dict[str, asyncio.Task] = {}
         self.bomb_timers: dict[tuple[str, str], asyncio.Task] = {}
         self.winner_tasks: set[asyncio.Task] = set()
+        # Network optimization tracking
+        self.last_state_hashes: dict[str, str] = {}
+        self.packet_counters: dict[str, int] = {}
 
     async def create_game(self, player_ids: list[str], timeout: int = 60) -> str:
         ic(player_ids, timeout)
@@ -116,12 +120,35 @@ class GameService:
         ic(game_id, game is not None, len(conns))
         if not game or not conns:
             return
-        state = game.model_dump()
-        ic("Broadcasting state size:", len(str(state)))
+
+        # Generate state with packet ID for tracking
+        packet_id = self.packet_counters.get(game_id, 0) + 1
+        self.packet_counters[game_id] = packet_id
+
+        state_json = game.model_dump_json()
+
+        # Check if state actually changed using hash
+        current_hash = get_state_hash(state_json)
+        last_hash = self.last_state_hashes.get(game_id, "")
+
+        if current_hash == last_hash:
+            ic(f"State unchanged for {game_id}, skipping broadcast")
+            return
+
+        self.last_state_hashes[game_id] = current_hash
+
+        # Compress with gzip for 70-90% size reduction
+        compressed, stats = compress_game_state(state_json)
+
+        ic(
+            f"State compression: {stats['original_size']}B -> {stats['compressed_size']}B "
+            f"({stats['compression_ratio']:.1f}% reduction)"
+        )
+
         dead: list[WebSocket] = []
         for ws in conns:
             try:
-                await ws.send_json(state)
+                await ws.send_bytes(compressed)
             except Exception as e:
                 ic(f"Broadcast error: {type(e).__name__}")
                 logger.warning(f"Broadcast failed for {game_id}: {e}")

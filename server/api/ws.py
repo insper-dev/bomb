@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from collections import Counter
+from collections import Counter, deque
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -10,6 +10,7 @@ from prisma.partials import Opponent
 
 from core.models.ws import (
     GameEvent,
+    GameEventType,
     MatchMakingEvent,
     MovimentEvent,
     PlaceBombEvent,
@@ -96,9 +97,87 @@ async def matchmaking_websocket(websocket: WebSocket) -> None:
             del waiting_players[user.id]
 
 
+async def _process_event_queues(
+    game_id: str, user_id: str, high_priority_queue: deque, normal_queue: deque
+) -> None:
+    """Process event queues with prioritization."""
+    last_movement_time = 0
+    movement_throttle = 0.05  # 20 FPS max for movements
+
+    try:
+        while True:
+            current_time = asyncio.get_event_loop().time()
+
+            # Process up to 3 high priority events per cycle
+            high_priority_processed = 0
+            while high_priority_queue and high_priority_processed < 3:
+                ev = high_priority_queue.popleft()
+                await _process_single_event(game_id, user_id, ev)
+                high_priority_processed += 1
+
+            # Process normal priority events with throttling
+            if normal_queue and (current_time - last_movement_time) >= movement_throttle:
+                # Process only the most recent movement to reduce lag
+                latest_movement = None
+                movements_skipped = 0
+
+                # Find the latest movement and count skipped ones
+                while normal_queue:
+                    ev = normal_queue.popleft()
+                    if isinstance(ev, MovimentEvent):
+                        if latest_movement is not None:
+                            movements_skipped += 1
+                        latest_movement = ev
+                    else:
+                        # Non-movement events are processed immediately
+                        await _process_single_event(game_id, user_id, ev)
+
+                # Process the latest movement if any
+                if latest_movement:
+                    await _process_single_event(game_id, user_id, latest_movement)
+                    last_movement_time = current_time
+
+                    if movements_skipped > 0:
+                        logger.debug(
+                            f"Skipped {movements_skipped} redundant movements for user {user_id}"
+                        )
+
+            # Small delay to prevent excessive CPU usage
+            await asyncio.sleep(0.01)  # 100 FPS processing loop
+
+    except asyncio.CancelledError:
+        logger.debug(f"Event processing cancelled for user {user_id} in game {game_id}")
+    except Exception as e:
+        logger.error(f"Error in event processing for user {user_id}: {e}")
+
+
+async def _process_single_event(game_id: str, user_id: str, ev: GameEventType) -> None:
+    """Process a single game event."""
+    try:
+        game = game_service.games.get(game_id)
+        if not game:
+            return
+
+        if isinstance(ev, MovimentEvent):
+            # Movement event
+            dx, dy = MovimentEvent.dxdy(ev.direction)
+            game.move_player(user_id, dx, dy, ev.direction)
+            await game_service.broadcast_state(game_id)
+
+        elif isinstance(ev, PlaceBombEvent):
+            # Place bomb at x, y (server assigns timing)
+            await game_service.place_bomb(game_id, user_id, ev.x, ev.y)
+
+        else:
+            logger.warning(f"Unknown event type: {type(ev).__name__}")
+
+    except Exception as e:
+        logger.error(f"Error processing event {type(ev).__name__} for user {user_id}: {e}")
+
+
 @router.websocket("/game/{game_id}")
 async def game_ws(websocket: WebSocket, game_id: str) -> None:
-    """WebSocket endpoint for real-time game play."""
+    """WebSocket endpoint for real-time game play with event prioritization."""
     # Authenticate via WS
     user = await auth_service.get_current_user_ws(websocket)
     await websocket.accept()
@@ -117,31 +196,40 @@ async def game_ws(websocket: WebSocket, game_id: str) -> None:
     # Send initial state
     await websocket.send_json(game.model_dump())
 
+    # Event prioritization queues
+    high_priority_queue: deque = deque(maxlen=50)
+    normal_queue: deque = deque(maxlen=100)
+
+    # Event processing task
+    processing_task = asyncio.create_task(
+        _process_event_queues(game_id, user.id, high_priority_queue, normal_queue)
+    )
+
     try:
         while True:
             raw = await websocket.receive_json()
             ev = GameEvent.validate_python(raw)
 
-            if isinstance(ev, MovimentEvent):
-                # Movement event
-                dx, dy = MovimentEvent.dxdy(ev.direction)
-                game.move_player(user.id, dx, dy, ev.direction)
-                await game_service.broadcast_state(game_id)
-
-            elif isinstance(ev, PlaceBombEvent):
-                # Place bomb at x, y (server assigns timing)
-                await game_service.place_bomb(game_id, user.id, ev.x, ev.y)
-
+            # Classify events by priority
+            if isinstance(ev, PlaceBombEvent):
+                # Critical events: bombs, explosions - highest priority
+                high_priority_queue.append(ev)
+                logger.debug(f"High priority event queued: {type(ev).__name__}")
+            elif isinstance(ev, MovimentEvent):
+                # Movement events - normal priority but frequent
+                normal_queue.append(ev)
             else:
-                # Unknown event: ignore or log
-                continue
+                # Unknown events - normal priority
+                normal_queue.append(ev)
 
     except WebSocketDisconnect:
         game_service.remove_connection(game_id, websocket)
-    except Exception:
-        # Unexpected error: close connection
+        processing_task.cancel()
+    except Exception as e:
+        logger.error(f"WebSocket error for user {user.id} in game {game_id}: {e}")
         await websocket.close(code=WebSocketCloseCode.ERROR)
         game_service.remove_connection(game_id, websocket)
+        processing_task.cancel()
 
 
 @router.websocket("/leaderboard")

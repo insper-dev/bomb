@@ -1,4 +1,5 @@
 import asyncio
+import gzip
 import threading
 import time
 from collections import deque
@@ -224,8 +225,19 @@ class GameService(ServiceBase):
                             # Medição de latência simples
                             receive_time = time.time()  # noqa: F841
 
+                            # Handle compressed data from server
+                            if isinstance(raw, bytes):
+                                # Decompress gzip data
+                                try:
+                                    raw_str = gzip.decompress(raw).decode("utf-8")
+                                except Exception as e:
+                                    print(f"[ERROR] Failed to decompress data: {e}")
+                                    continue
+                            else:
+                                raw_str = str(raw)
+
                             # Parse otimizado do estado
-                            new_state = self._parse_state_optimized(raw)
+                            new_state = self._parse_state_optimized(raw_str)
                             if new_state:
                                 self.state = new_state
                                 self._state_dirty = True

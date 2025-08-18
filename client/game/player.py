@@ -33,21 +33,26 @@ class Player:
         self.visual_y = 0.0
         self.target_x = 0.0
         self.target_y = 0.0
-        self.interpolation_speed = 0.15  # Velocidade da interpolação
+        self.interpolation_speed = 0.2  # Aumentado para resposta mais rápida
 
         # Animação de sprite
         self.animation_frame = 0
         self.animation_timer = 0
-        self.animation_speed = 150  # ms por frame
+        self.animation_speed = 120  # Reduzido para animação mais fluida
 
         # Cache do último estado conhecido
         self.last_server_x = 0
         self.last_server_y = 0
+        self.last_server_timestamp = 0
 
         # Buffer de input para responsividade
         self.pending_moves = []
         self.last_move_time = 0
-        self.move_cooldown = 50  # ms entre movimentos
+        self.move_cooldown = 100  # Aumentado para reduzir spam
+
+        # Sistema de correção de posição
+        self.correction_threshold = 1.5  # Distância para forçar correção
+        self.last_correction_time = 0
 
         # Inicializa posições visuais com posição inicial do servidor
         self._initialize_visual_position()
@@ -76,7 +81,7 @@ class Player:
 
     def handle_event(self, event: pygame.event.Event) -> None:
         """
-        Processa eventos com throttling para reduzir lag de input.
+        Processa eventos com throttling e validação melhorados.
         """
         if event.type != pygame.KEYDOWN:
             return
@@ -100,15 +105,51 @@ class Player:
 
         if event.key in key_map:
             direction = key_map[event.key]
-            # Predição local otimista para responsividade
-            self._predict_movement(direction)
-            self.game_service.send_move(direction)
-            self.last_move_time = current_time
+
+            # Validação de movimento antes de enviar
+            if self._can_move(direction):
+                # Predição local mais conservadora
+                self._predict_movement(direction)
+                self.game_service.send_move(direction)
+                self.last_move_time = current_time
+
+                # Adiciona movimento ao buffer para reconciliação
+                self.pending_moves.append({"direction": direction, "timestamp": current_time})
+
+                # Limpa movimentos antigos do buffer
+                self._clean_pending_moves(current_time)
+
         elif event.key == pygame.K_SPACE:
+            # Throttling para bombas também
+            if current_time - self.last_move_time < self.move_cooldown // 2:
+                return
             self.game_service.send_bomb()
+            self.last_move_time = current_time
+
+    def _can_move(self, direction: PlayerDirectionState) -> bool:
+        """Valida se o movimento é possível baseado no estado atual."""
+        ps = self.player_state
+        if not ps:
+            return False
+
+        # Calcula nova posição
+        dx, dy = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}.get(
+            direction, (0, 0)
+        )
+
+        new_x = ps.x + dx
+        new_y = ps.y + dy
+
+        # Verifica limites básicos do mapa
+        if not (0 <= new_x <= 15 and 0 <= new_y <= 11):
+            return False
+
+        # Aqui poderia adicionar validação de colisão com blocos
+        # mas isso dependeria de ter acesso ao mapa atual
+        return True
 
     def _predict_movement(self, direction: PlayerDirectionState) -> None:
-        """Predição local otimista do movimento para reduzir lag percebido."""
+        """Predição local mais conservadora do movimento."""
         ps = self.player_state
         if not ps:
             return
@@ -118,46 +159,99 @@ class Player:
             direction, (0, 0)
         )
 
-        # Atualiza posição visual instantaneamente
-        new_x = max(0, min(ps.x + dx, 15))  # Limites básicos do mapa
-        new_y = max(0, min(ps.y + dy, 11))
+        # Aplica predição apenas se a diferença atual for pequena
+        current_diff = abs(self.target_x - ps.x) + abs(self.target_y - ps.y)
+        if current_diff < 0.5:  # Só prediz se estiver sincronizado
+            new_x = max(0, min(ps.x + dx, 15))
+            new_y = max(0, min(ps.y + dy, 11))
 
-        self.target_x = new_x
-        self.target_y = new_y
+            self.target_x = new_x
+            self.target_y = new_y
+
+    def _clean_pending_moves(self, current_time: int) -> None:
+        """Remove movimentos antigos do buffer."""
+        # Remove movimentos com mais de 2 segundos
+        self.pending_moves = [
+            move for move in self.pending_moves if current_time - move["timestamp"] < 2000
+        ]
 
     def update(self) -> None:
-        """Atualiza interpolação e animações."""
+        """Atualiza interpolação, animações e reconciliação."""
         ps = self.player_state
         if not ps:
             return
 
-        # Detecta mudança no estado do servidor
-        if ps.x != self.last_server_x or ps.y != self.last_server_y:
-            self.target_x = ps.x
-            self.target_y = ps.y
+        current_time = pygame.time.get_ticks()
+
+        # Detecta mudança significativa no estado do servidor
+        server_moved = ps.x != self.last_server_x or ps.y != self.last_server_y
+
+        if server_moved:
+            # Calcula distância da discrepância
+            distance = ((ps.x - self.target_x) ** 2 + (ps.y - self.target_y) ** 2) ** 0.5
+
+            # Se a discrepância for muito grande, força correção
+            if distance > self.correction_threshold:
+                self.target_x = ps.x
+                self.target_y = ps.y
+                self.visual_x = ps.x
+                self.visual_y = ps.y
+                self.last_correction_time = current_time
+            else:
+                # Atualização suave para pequenas discrepâncias
+                self.target_x = ps.x
+                self.target_y = ps.y
+
             self.last_server_x = ps.x
             self.last_server_y = ps.y
+            self.last_server_timestamp = current_time
 
         # Interpolação suave da posição visual
-        self.visual_x += (self.target_x - self.visual_x) * self.interpolation_speed
-        self.visual_y += (self.target_y - self.visual_y) * self.interpolation_speed
+        lerp_speed = self.interpolation_speed
 
-        # Se muito próximo, assume posição final
-        if abs(self.target_x - self.visual_x) < 0.01:
+        # Acelera interpolação se estiver muito longe do target
+        distance_to_target = abs(self.target_x - self.visual_x) + abs(self.target_y - self.visual_y)
+        if distance_to_target > 0.5:
+            lerp_speed *= 2  # Acelera para alcançar rapidamente
+
+        self.visual_x += (self.target_x - self.visual_x) * lerp_speed
+        self.visual_y += (self.target_y - self.visual_y) * lerp_speed
+
+        # Snap para posição final se muito próximo
+        if abs(self.target_x - self.visual_x) < 0.02:
             self.visual_x = self.target_x
-        if abs(self.target_y - self.visual_y) < 0.01:
+        if abs(self.target_y - self.visual_y) < 0.02:
             self.visual_y = self.target_y
 
-        # Atualiza animação
-        current_time = pygame.time.get_ticks()
-        if current_time - self.animation_timer > self.animation_speed:
+        # Atualiza animação baseada no movimento
+        self._update_animation(current_time)
+
+    def _update_animation(self, current_time: int) -> None:
+        """Atualiza animação baseada no estado de movimento."""
+        ps = self.player_state
+        if not ps:
+            return
+
+        # Determina se está se movendo
+        is_moving = (
+            abs(self.target_x - self.visual_x) > 0.02 or abs(self.target_y - self.visual_y) > 0.02
+        )
+
+        # Ajusta velocidade da animação baseada no movimento
+        anim_speed = self.animation_speed if is_moving else self.animation_speed * 2
+
+        if current_time - self.animation_timer > anim_speed:
             frames = PLAYERS_MAP[ps.skin][ps.direction_state]
-            self.animation_frame = (self.animation_frame + 1) % len(frames)
+            if is_moving:
+                self.animation_frame = (self.animation_frame + 1) % len(frames)
+            else:
+                # Para em frame neutro quando parado
+                self.animation_frame = 0
             self.animation_timer = current_time
 
     def render(self) -> None:
         """
-        Renderização otimizada com interpolação suave e melhor feedback visual.
+        Renderização otimizada com melhor feedback visual.
         """
         ps = self.player_state
         if ps is None:
@@ -171,47 +265,102 @@ class Player:
         frames = PLAYERS_MAP[ps.skin][ps.direction_state]
         sprite = frames[self.animation_frame]
 
-        # Renderização com shadow para profundidade
+        # Feedback visual melhorado
         current = self.app.auth_service.current_user
         is_local = current and current.id == self.player_id
 
+        # Renderização com efeitos
         if is_local:
-            # Sombra para jogador local
-            shadow_color = (0, 0, 0, 80)
-            shadow_surface = pygame.Surface((MODULE_SIZE + 4, MODULE_SIZE + 4), pygame.SRCALPHA)
-            shadow_surface.fill(shadow_color)
-            self.app.screen.blit(shadow_surface, (x_px - 2, y_px + 2))
+            self._render_local_player_effects(x_px, y_px)
 
         # Sprite principal
         self.app.screen.blit(sprite, (x_px, y_px))
 
-        # Contorno melhorado para jogador local
+        # Contorno para jogador local
         if is_local:
-            rect = sprite.get_rect(topleft=(x_px, y_px))
-            # Gradiente dourado pulsante
-            pulse = abs(pygame.time.get_ticks() % 1000 - 500) / 500.0
-            gold_intensity = int(200 + 55 * pulse)
-            gold_color = (gold_intensity, int(gold_intensity * 0.84), 0)
-            pygame.draw.rect(self.app.screen, gold_color, rect, width=3)
+            self._render_local_player_outline(sprite, x_px, y_px)
 
-        # Indicador de vida/status se necessário
+        # Indicadores de status
+        self._render_status_indicators(x_px, y_px, ps)
+
+    def _render_local_player_effects(self, x_px: float, y_px: float) -> None:
+        """Renderiza efeitos para o jogador local."""
+        # Sombra suave
+        shadow_size = MODULE_SIZE + 6
+        shadow_surface = pygame.Surface((shadow_size, shadow_size), pygame.SRCALPHA)
+
+        # Gradient shadow
+        for i in range(3):
+            alpha = 60 - i * 15
+            radius = (shadow_size // 2) - i
+            pygame.draw.circle(
+                shadow_surface, (0, 0, 0, alpha), (shadow_size // 2, shadow_size // 2), radius
+            )
+
+        self.app.screen.blit(shadow_surface, (x_px - 3, y_px + 1))
+
+    def _render_local_player_outline(
+        self, sprite: pygame.Surface, x_px: float, y_px: float
+    ) -> None:
+        """Renderiza contorno dourado para jogador local."""
+        rect = sprite.get_rect(topleft=(x_px, y_px))
+
+        # Efeito pulsante
+        current_time = pygame.time.get_ticks()
+        pulse = abs((current_time % 1500) - 750) / 750.0
+        gold_intensity = int(180 + 75 * pulse)
+
+        # Gradiente dourado
+        gold_color = (gold_intensity, int(gold_intensity * 0.85), int(gold_intensity * 0.1))
+
+        # Contorno duplo para melhor visibilidade
+        pygame.draw.rect(self.app.screen, (40, 40, 40), rect.inflate(6, 6), width=1)
+        pygame.draw.rect(self.app.screen, gold_color, rect.inflate(4, 4), width=2)
+
+    def _render_status_indicators(self, x_px: float, y_px: float, ps: PlayerState) -> None:
+        """Renderiza indicadores de status do jogador."""
+        # Indicador de lag/sincronização
+        current_time = pygame.time.get_ticks()
+        if current_time - self.last_correction_time < 1000:  # Mostra por 1 segundo após correção
+            # Pequeno indicador vermelho para mostrar correção de posição
+            indicator_surface = pygame.Surface((6, 6), pygame.SRCALPHA)
+            pygame.draw.circle(indicator_surface, (255, 50, 50, 180), (3, 3), 3)
+            self.app.screen.blit(indicator_surface, (x_px + MODULE_SIZE - 8, y_px - 8))
+
+        # Barra de vida se implementada no futuro
         if hasattr(ps, "health") and ps.health < 100:
-            self._render_health_bar(x_px, y_px - 8, ps.health)
+            self._render_health_bar(x_px, y_px - 10, ps.health)
 
     def _render_health_bar(self, x: float, y: float, health: int) -> None:
-        """Renderiza barra de vida sobre o jogador."""
+        """Renderiza barra de vida melhorada sobre o jogador."""
         bar_width = MODULE_SIZE
-        bar_height = 4
+        bar_height = 6
 
-        # Fundo da barra
-        bg_rect = pygame.Rect(x, y, bar_width, bar_height)
-        pygame.draw.rect(self.app.screen, (60, 60, 60), bg_rect)
+        # Fundo da barra com bordas
+        bg_rect = pygame.Rect(x - 1, y - 1, bar_width + 2, bar_height + 2)
+        pygame.draw.rect(self.app.screen, (20, 20, 20), bg_rect)
 
-        # Barra de vida
+        inner_rect = pygame.Rect(x, y, bar_width, bar_height)
+        pygame.draw.rect(self.app.screen, (60, 60, 60), inner_rect)
+
+        # Barra de vida com gradiente
         health_width = int((health / 100) * bar_width)
         if health_width > 0:
-            health_color = (
-                (255, 0, 0) if health < 30 else (255, 255, 0) if health < 70 else (0, 255, 0)
-            )
+            # Cores baseadas na vida
+            if health < 25:
+                color = (255, 50, 50)  # Vermelho crítico
+            elif health < 50:
+                color = (255, 150, 50)  # Laranja
+            elif health < 75:
+                color = (255, 255, 50)  # Amarelo
+            else:
+                color = (50, 255, 50)  # Verde
+
             health_rect = pygame.Rect(x, y, health_width, bar_height)
-            pygame.draw.rect(self.app.screen, health_color, health_rect)
+            pygame.draw.rect(self.app.screen, color, health_rect)
+
+            # Brilho na barra
+            if health_width > 2:
+                highlight_rect = pygame.Rect(x, y, health_width, 2)
+                highlight_color = tuple(min(255, c + 40) for c in color)
+                pygame.draw.rect(self.app.screen, highlight_color, highlight_rect)
