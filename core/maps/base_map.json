@@ -1,0 +1,25 @@
+{
+  "tileset": {
+    "name": "Desert Tileset",
+    "destructible": "SAND_BOX",
+    "undestroyable": "DIAMOND_BOX",
+    "background": "desert_background"
+  },
+  "map": {
+    "rows": 11,
+    "columns": 13,
+    "layout": [
+      ["U", "U", "U", "U", "U", "U", "U", "U", "U", "U", "U", "U", "U"],
+      ["U", " ", " ", "D", "D", "D", "D", "D", "D", "D", " ", " ", "U"],
+      ["U", " ", "U", "D", "U", "D", "U", "D", "U", "D", "U", " ", "U"],
+      ["U", "D", "D", "D", "D", "D", "D", "D", "D", "D", "D", "D", "U"],
+      ["U", "D", "U", "D", "U", "D", "U", "D", "U", "D", "U", "D", "U"],
+      ["U", "D", "D", "D", "D", "D", "D", "D", "D", "D", "D", "D", "U"],
+      ["U", "D", "U", "D", "U", "D", "U", "D", "U", "D", "U", "D", "U"],
+      ["U", "D", "D", "D", "D", "D", "D", "D", "D", "D", "D", "D", "U"],
+      ["U", " ", "U", "D", "U", "D", "U", "D", "U", "D", "U", " ", "U"],
+      ["U", " ", " ", "D", "D", "D", "D", "D", "D", "D", " ", " ", "U"],
+      ["U", "U", "U", "U", "U", "U", "U", "U", "U", "U", "U", "U", "U"]
+    ]
+  }
+}

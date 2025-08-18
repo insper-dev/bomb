@@ -1,3 +1,4 @@
+import json
 import random
 from datetime import datetime
 from enum import Enum
@@ -62,8 +63,22 @@ class PlayerState(BaseModel):
 
 def generate_map() -> list[list[MapBlockType]]:
     # TODO: "geração" de mapa para um arquivo estático, só randomiza o tipo de bloco e boa.
-    width = 13  # Standard Bomberman-like grid width (odd number)
-    height = 11  # Standard Bomberman-like grid height (odd number)
+    maps_path = "core/maps"
+
+    # Load base map
+    with open(f"{maps_path}/base_map.json") as f:
+        base_map_data = json.load(f)
+
+    map = base_map_data["map"]
+    tileset = base_map_data["tileset"]
+
+    if map["rows"] and map["columns"]:
+        width = map.get("columns")
+        height = map.get("rows")
+    else:
+        width = 13  # Standard Bomberman-like grid width (odd number)
+        height = 11  # Standard Bomberman-like grid height (odd number)
+
     ic(f"Generating map: {width}x{height}")
 
     # Start with an empty grid
@@ -74,21 +89,18 @@ def generate_map() -> list[list[MapBlockType]]:
     for y in range(height):
         for x in range(width):
             if x % 2 == 0 and y % 2 == 0:
-                map_grid[y][x] = random.choice(UNDESTOYABLE_BOXES)
-                indestructible_count += 1
+                block_type = map["layout"][y][x]
+                if block_type == "D":
+                    block = getattr(MapBlockType, tileset["destroyable"])
+                elif block_type == "U":
+                    block = getattr(MapBlockType, tileset["undestroyable"])
+                else:
+                    block = MapBlockType.EMPTY
+                map_grid[y][x] = block
+
+    destructible_count = 0
 
     ic(f"Placed {indestructible_count} indestructible blocks")
-
-    # Place destructible boxes randomly with a probability (around 40% of empty spaces)
-    destructible_count = 0
-    for y in range(height):
-        for x in range(width):
-            if map_grid[y][x] == MapBlockType.EMPTY and not (
-                (x <= 1 and y <= 1) or (x >= width - 2 and y >= height - 2)
-            ):
-                if random.random() < 0.4:  # 40% chance to place a destructible box
-                    map_grid[y][x] = random.choice(DESTROYABLE_BOXES)
-                    destructible_count += 1
 
     ic(f"Placed {destructible_count} destructible blocks")
 

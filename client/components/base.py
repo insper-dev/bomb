@@ -87,7 +87,7 @@ class BaseComponent(ABC):
 
     def _get_color(self, surface_part: Literal["bg", "text", "border"]) -> pygame.Color:
         """
-        Get the color of the component based on its part.
+        Get the color of the component based on its part:
         """
         colors = VARIANT_MAP[self.is_disabled][self.is_focused]
 
