@@ -1,7 +1,7 @@
 {
   "tileset": {
     "name": "Desert Tileset",
-    "destructible": "SAND_BOX",
+    "destroyable": "SAND_BOX",
     "undestroyable": "DIAMOND_BOX",
     "background": "desert_background"
   },

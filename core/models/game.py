@@ -86,19 +86,19 @@ def generate_map() -> list[list[MapBlockType]]:
 
     # Place indestructible blocks in a pattern (every other cell)
     indestructible_count = 0
+    destructible_count = 0
     for y in range(height):
         for x in range(width):
-            if x % 2 == 0 and y % 2 == 0:
-                block_type = map["layout"][y][x]
-                if block_type == "D":
-                    block = getattr(MapBlockType, tileset["destroyable"])
-                elif block_type == "U":
-                    block = getattr(MapBlockType, tileset["undestroyable"])
-                else:
-                    block = MapBlockType.EMPTY
-                map_grid[y][x] = block
-
-    destructible_count = 0
+            block_type = map["layout"][y][x]
+            if block_type == "D":
+                block = getattr(MapBlockType, tileset["destroyable"])
+                destructible_count += 1
+            elif block_type == "U":
+                indestructible_count += 1
+                block = getattr(MapBlockType, tileset["undestroyable"])
+            else:
+                block = MapBlockType.EMPTY
+            map_grid[y][x] = block
 
     ic(f"Placed {indestructible_count} indestructible blocks")
 
