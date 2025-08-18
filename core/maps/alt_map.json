@@ -1,9 +1,9 @@
 {
   "tileset": {
-    "name": "Desert Tileset",
-    "destroyable": "SAND_BOX",
-    "undestroyable": "DIAMOND_BOX",
-    "background": "desert_background"
+    "name": "The Bunker Tileset",
+    "destroyable": "WOODEN_BOX",
+    "undestroyable": "METAL_BOX",
+    "background": "bunker_background"
   },
   "map": {
     "rows": 11,

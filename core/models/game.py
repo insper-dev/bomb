@@ -64,32 +64,47 @@ class PlayerState(BaseModel):
 def generate_map() -> list[list[MapBlockType]]:
     # TODO: "geração" de mapa para um arquivo estático, só randomiza o tipo de bloco e boa.
     maps_path = "core/maps"
+    base_map_path = f"{maps_path}/base_map.json"
+    alt_map_path = f"{maps_path}/alt_map.json"
+
+    map_path = random.choice([base_map_path, alt_map_path])
 
     # Load base map
-    with open(f"{maps_path}/base_map.json") as f:
+    with open(map_path) as f:
         base_map_data = json.load(f)
 
+    # Map structure
     map = base_map_data["map"]
-    tileset = base_map_data["tileset"]
+    # columns, rows, layout
+    # layout is a 2D array of characters representing block types
+    # D = destructible, U = undestructible, E = empty, R = random (D or E)
 
-    if map["rows"] and map["columns"]:
-        width = map.get("columns")
-        height = map.get("rows")
-    else:
-        width = 13  # Standard Bomberman-like grid width (odd number)
-        height = 11  # Standard Bomberman-like grid height (odd number)
+    # Tileset structure
+    tileset = base_map_data["tileset"]
+    # styles and sprites for the map
+    # name, destroyable, undestroyable, background
+
+    width = map.get("columns", 13)  # Default width for bomberman-like games
+    height = map.get("rows", 11)  # Default height for bomberman-like games
 
     ic(f"Generating map: {width}x{height}")
 
     # Start with an empty grid
     map_grid = [[MapBlockType.EMPTY for _ in range(width)] for _ in range(height)]
 
-    # Place indestructible blocks in a pattern (every other cell)
+    # Place indestructible blocks in layout patern
+
+    # Count indestructible and destructible blocks
     indestructible_count = 0
     destructible_count = 0
+
+    # Asemble the map grid based on the layout
     for y in range(height):
         for x in range(width):
-            block_type = map["layout"][y][x]
+            block_type = map["layout"][y][x]  # get the block type from the layout
+            print(f"Processing block at ({x}, {y}): {block_type}")
+            if block_type == "R":
+                block_type = random.choice(["D", "U"])
             if block_type == "D":
                 block = getattr(MapBlockType, tileset["destroyable"])
                 destructible_count += 1
@@ -103,15 +118,6 @@ def generate_map() -> list[list[MapBlockType]]:
     ic(f"Placed {indestructible_count} indestructible blocks")
 
     ic(f"Placed {destructible_count} destructible blocks")
-
-    # Ensure corners are empty for player starting positions
-    map_grid[0][0] = MapBlockType.EMPTY
-    map_grid[0][1] = MapBlockType.EMPTY
-    map_grid[1][0] = MapBlockType.EMPTY
-
-    map_grid[height - 1][width - 1] = MapBlockType.EMPTY
-    map_grid[height - 1][width - 2] = MapBlockType.EMPTY
-    map_grid[height - 2][width - 1] = MapBlockType.EMPTY
 
     # # Occasionally place power-ups (5% chance in destructible boxes)
     # power_up_count = 0
