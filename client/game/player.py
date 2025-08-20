@@ -1,7 +1,7 @@
 import pygame
 
 from client.services.game import GameService
-from core.constants import MODULE_SIZE, PLAYERS_MAP
+from core.constants import MODULE_SIZE, PLAYERS_MAP, MapBlockType
 from core.models.game import PlayerState
 from core.types import PlayerDirectionState
 
@@ -137,15 +137,31 @@ class Player:
             direction, (0, 0)
         )
 
+        # Calcula nova posição baseada na direção
         new_x = ps.x + dx
         new_y = ps.y + dy
 
-        # Verifica limites básicos do mapa
-        if not (0 <= new_x <= 15 and 0 <= new_y <= 11):
-            return False
+        # Obtem o mapa atual do estado do jogo (se existir)
+        map = self.game_service.state.map if self.game_service.state else None
+        if map:
+            # Verifica limites do mapa
+            lim_x = len(map[0])
+            lim_y = len(map)
 
-        # Aqui poderia adicionar validação de colisão com blocos
-        # mas isso dependeria de ter acesso ao mapa atual
+            # Verifica se a nova posição é válida dentro do mapa
+            if new_x < 0 or new_x >= lim_x or new_y < 0 or new_y >= lim_y:
+                return False
+
+            # Verifica se o espaço é vazio ou não):
+            space = map[new_y][new_x]
+            if not (space == MapBlockType.EMPTY or space is None):
+                return False
+        else:
+            # Se não houver mapa, assume que o movimento é válido com limites básicos
+            # Verifica limites básicos do mapa
+            if not (0 <= new_x <= 15 and 0 <= new_y <= 11):
+                return False
+
         return True
 
     def _predict_movement(self, direction: PlayerDirectionState) -> None:
