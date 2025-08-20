@@ -104,7 +104,9 @@ def generate_map() -> list[list[MapBlockType]]:
             block_type = map["layout"][y][x]  # get the block type from the layout
             print(f"Processing block at ({x}, {y}): {block_type}")
             if block_type == "R":
-                block_type = random.choice(["D", "U"])
+                block_type = random.choice(
+                    ["D", "E"]
+                )  # Randomly choose between destructible or empty
             if block_type == "D":
                 block = getattr(MapBlockType, tileset["destroyable"])
                 destructible_count += 1
