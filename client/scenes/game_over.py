@@ -277,8 +277,10 @@ class GameOverScene(BaseScene):
 
     def _render_loading_state(self) -> None:
         """Renderiza estado de carregamento."""
-        self.loading_text.update()
-        self.loading_text.render(self.app.screen)
+        font = pygame.font.SysFont("Arial", 20)
+        text_surface = font.render(self.loading_text, True, WHITE)
+        text_rect = text_surface.get_rect(center=self.loading_pos)
+        self.app.screen.blit(text_surface, text_rect)
 
         # Spinner animado
         cx, cy = self.app.screen_center
