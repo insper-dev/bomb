@@ -25,6 +25,12 @@ jobs:
             docker rm -f app
           fi
 
+      - name: Criar volume para banco de dados (se não existir)
+        run: |
+          if ! docker volume ls --format '{{.Name}}' | grep -q '^bomb_db$'; then
+            docker volume create bomb_db
+          fi
+
       - name: Iniciar container com variáveis de ambiente
         env:
           EXTERNAL_PORT: ${{ secrets.EXTERNAL_PORT }}
@@ -35,4 +41,5 @@ jobs:
             --restart always \
             -p ${EXTERNAL_PORT}:8000 \
             -e SERVER_SECRET_KEY \
+            -v bomb_db:/app \
             felipeadeildo/app:latest
