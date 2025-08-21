@@ -162,5 +162,5 @@ cython_debug/
 #.idea/
 
 .env
-*.db*
+data/*.db*
 .session.json

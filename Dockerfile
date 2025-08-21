@@ -4,16 +4,13 @@ WORKDIR /app
 
 COPY . .
 
+RUN chmod +x entrypoint.sh
+
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Gera o Prisma Client
 RUN python -m prisma generate
 
-# Executa as migrations
-RUN python -m prisma migrate deploy
-
-# Porta padrão para o servidor
 EXPOSE 8000
 
-# Inicia o servidor
+ENTRYPOINT [ "./entrypoint.sh" ]
 CMD ["python", "main.py", "-m", "server"]

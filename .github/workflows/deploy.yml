@@ -16,19 +16,19 @@ jobs:
         run: |
           docker build \
             --file Dockerfile \
-            --tag felipeadeildo/app:latest \
+            --tag insper-dev/bomb:latest \
             .
 
       - name: Remover container antigo (se houver)
         run: |
-          if docker ps -a --format '{{.Names}}' | grep -q '^app$'; then
+          if docker ps -a --format '{{.Names}}' | grep -q '^bomb-insper$'; then
             docker rm -f app
           fi
 
       - name: Criar volume para banco de dados (se não existir)
         run: |
-          if ! docker volume ls --format '{{.Name}}' | grep -q '^bomb_db$'; then
-            docker volume create bomb_db
+          if ! docker volume ls --format '{{.Name}}' | grep -q '^bomb_insper_db$'; then
+            docker volume create bomb_insper_db
           fi
 
       - name: Iniciar container com variáveis de ambiente
@@ -37,9 +37,9 @@ jobs:
           SERVER_SECRET_KEY: ${{ secrets.SERVER_SECRET_KEY }}
         run: |
           docker run -d \
-            --name app \
+            --name bomb-insper \
             --restart always \
             -p ${EXTERNAL_PORT}:8000 \
             -e SERVER_SECRET_KEY \
-            -v bomb_db:/app \
-            felipeadeildo/app:latest
+            -v bomb_insper_db:/app/data \
+            insper-dev/bomb:latest
