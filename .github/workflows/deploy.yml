@@ -22,7 +22,7 @@ jobs:
       - name: Remover container antigo (se houver)
         run: |
           if docker ps -a --format '{{.Names}}' | grep -q '^bomb-insper$'; then
-            docker rm -f app
+            docker rm -f bomb-insper
           fi
 
       - name: Criar volume para banco de dados (se não existir)
