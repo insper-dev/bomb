@@ -27,9 +27,8 @@ jobs:
 
       - name: Compilar com PyInstaller
         run: |
-          python -c "import certifi; print(certifi.where())" > certifi_path.txt
-          set /p CERTIFI_PATH=<certifi_path.txt
-          pyinstaller --noconfirm --clean --onefile --windowed --name bomb --add-data "client\assets;client\assets" --add-data "%CERTIFI_PATH%;." main.py
+          $env:CERTIFI_PATH = python -c "import certifi; print(certifi.where())"
+          pyinstaller --noconfirm --clean --onefile --windowed --name bomb --add-data "client\assets;client\assets" --add-data "$env:CERTIFI_PATH;." main.py
 
       - name: Publicar artefato Windows
         uses: actions/upload-artifact@v4
