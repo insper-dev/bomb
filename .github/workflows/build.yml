@@ -27,7 +27,9 @@ jobs:
 
       - name: Compilar com PyInstaller
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name bomb --add-data "client\assets;client\assets" main.py
+          python -c "import certifi; print(certifi.where())" > certifi_path.txt
+          set /p CERTIFI_PATH=<certifi_path.txt
+          pyinstaller --noconfirm --clean --onefile --windowed --name bomb --add-data "client\assets;client\assets" --add-data "%CERTIFI_PATH%;." main.py
 
       - name: Publicar artefato Windows
         uses: actions/upload-artifact@v4
@@ -59,12 +61,14 @@ jobs:
 
       - name: Compilar com PyInstaller
         run: |
+          CERTIFI_PATH=$(python -c "import certifi; print(certifi.where())")
           pyinstaller \
             --noconfirm --clean \
             --onefile \
             --windowed \
             --name bomb-linux \
             --add-data "client/assets:client/assets" \
+            --add-data "$CERTIFI_PATH:." \
             main.py
 
       - name: Publicar artefato Linux
@@ -94,12 +98,14 @@ jobs:
 
       - name: Compilar com PyInstaller
         run: |
+          CERTIFI_PATH=$(python -c "import certifi; print(certifi.where())")
           pyinstaller \
             --noconfirm --clean \
             --onefile \
             --windowed \
             --name bomb-macos \
             --add-data "client/assets:client/assets" \
+            --add-data "$CERTIFI_PATH:." \
             main.py
 
       - name: Publicar artefato macOS

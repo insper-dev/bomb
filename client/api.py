@@ -12,6 +12,7 @@ from typing import Literal
 import httpx
 
 from core.models.network import RequestState
+from core.ssl_config import get_ssl_context
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +30,16 @@ class APIClient:
             auth_token: Authentication token
         """
         protocol = "https" if use_ssl else "http"
-        self.client = httpx.Client(
-            base_url=f"{protocol}://{endpoint}/api",
-            headers={"User-Agent": "Pygame Client :D"},
-        )
+
+        client_kwargs = {
+            "base_url": f"{protocol}://{endpoint}/api",
+            "headers": {"User-Agent": "Pygame Client :D"},
+        }
+
+        if use_ssl:
+            client_kwargs["verify"] = get_ssl_context()
+
+        self.client = httpx.Client(**client_kwargs)
         self.auth_token = auth_token
 
         self.pending_requests: dict[str, RequestState] = {}

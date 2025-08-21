@@ -8,6 +8,7 @@ from websockets.exceptions import InvalidHandshake
 
 from client.services.base import ServiceBase
 from core.models.ws import MatchMakingEvent
+from core.ssl_config import get_websocket_ssl_context
 
 
 class MatchmakingService(ServiceBase):
@@ -92,7 +93,9 @@ class MatchmakingService(ServiceBase):
                 break
 
             try:
-                async with connect(uri) as ws:
+                # Configure SSL context for websocket connection
+                ssl_context = get_websocket_ssl_context() if protocol == "wss" else None
+                async with connect(uri, ssl=ssl_context) as ws:
                     self.websocket = ws
                     # aguarda evento match_found
                     while self.running:
