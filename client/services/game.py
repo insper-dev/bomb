@@ -10,6 +10,7 @@ from websockets import ClientConnection, ConnectionClosed, connect
 from client.services.base import ServiceBase
 from core.models.game import BombState, GameState, GameStatus
 from core.models.ws import MovimentEvent, PlaceBombEvent
+from core.ssl_config import get_websocket_ssl_context
 from core.types import PlayerDirectionState
 
 
@@ -201,8 +202,12 @@ class GameService(ServiceBase):
                 "Upgrade": "websocket",
             }
 
+            # Configure SSL context for websocket connection
+            ssl_context = get_websocket_ssl_context() if protocol == "wss" else None
+
             async with connect(
                 uri,
+                ssl=ssl_context,
                 additional_headers=extra_headers,
                 ping_interval=20,
                 ping_timeout=10,
