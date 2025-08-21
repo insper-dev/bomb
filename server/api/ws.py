@@ -178,10 +178,17 @@ async def _process_single_event(game_id: str, user_id: str, ev: GameEventType) -
 @router.websocket("/game/{game_id}")
 async def game_ws(websocket: WebSocket, game_id: str) -> None:
     """WebSocket endpoint for real-time game play with event prioritization."""
-    # Authenticate via WS
-    user = await auth_service.get_current_user_ws(websocket)
+    logger.info(f"Game WebSocket connection attempt for game {game_id}")
+    logger.info(f"Query params: {websocket.query_params}")
+
+    # Accept connection first, then authenticate
     await websocket.accept()
-    if not user:
+    logger.info(f"WebSocket accepted for game {game_id}")
+
+    # Authenticate via WS
+    try:
+        user = await auth_service.get_current_user_ws(websocket)
+    except Exception:
         await websocket.close(code=WebSocketCloseCode.UNAUTHORIZED)
         return
 

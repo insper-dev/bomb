@@ -1,5 +1,4 @@
 import asyncio
-import gzip
 import threading
 import time
 from collections import deque
@@ -10,6 +9,7 @@ from websockets import ClientConnection, ConnectionClosed, connect
 from client.services.base import ServiceBase
 from core.models.game import BombState, GameState, GameStatus
 from core.models.ws import MovimentEvent, PlaceBombEvent
+from core.serialization import unpack_game_state
 from core.ssl_config import get_websocket_ssl_context
 from core.types import PlayerDirectionState
 
@@ -193,22 +193,17 @@ class GameService(ServiceBase):
         """Conexão WebSocket otimizada com medição de latência."""
         protocol = "wss" if self.app.settings.server_endpoint_ssl else "ws"
         uri = f"{protocol}://{self.app.settings.server_endpoint}/ws/game/{self.match_id}?token={self._token}"
+        print(f"[DEBUG] Tentando conectar ao game WebSocket: {uri[:100]}...")
+        print(f"[DEBUG] Match ID: {self.match_id}")
+        print(f"[DEBUG] Token exists: {bool(self._token)}")
 
         try:
-            # Configurações otimizadas para WebSocket
-            extra_headers = {
-                "User-Agent": "BombGame-Client/1.0",
-                "Connection": "Upgrade",
-                "Upgrade": "websocket",
-            }
-
             # Configure SSL context for websocket connection
             ssl_context = get_websocket_ssl_context() if protocol == "wss" else None
 
             async with connect(
                 uri,
                 ssl=ssl_context,
-                additional_headers=extra_headers,
                 ping_interval=20,
                 ping_timeout=10,
                 max_size=2**20,
@@ -230,19 +225,21 @@ class GameService(ServiceBase):
                             # Medição de latência simples
                             receive_time = time.time()  # noqa: F841
 
-                            # Handle compressed data from server
+                            # Handle packed data from server
                             if isinstance(raw, bytes):
-                                # Decompress gzip data
+                                # Unpack msgpack data
                                 try:
-                                    raw_str = gzip.decompress(raw).decode("utf-8")
+                                    state_dict = unpack_game_state(raw)
+                                    # Convert back to state object
+                                    new_state = GameState.model_validate(state_dict)
                                 except Exception as e:
-                                    print(f"[ERROR] Failed to decompress data: {e}")
+                                    print(f"[ERROR] Failed to unpack data: {e}")
                                     continue
                             else:
+                                # Fallback for JSON (shouldn't happen in normal operation)
                                 raw_str = str(raw)
+                                new_state = self._parse_state_optimized(raw_str)
 
-                            # Parse otimizado do estado
-                            new_state = self._parse_state_optimized(raw_str)
                             if new_state:
                                 self.state = new_state
                                 self._state_dirty = True

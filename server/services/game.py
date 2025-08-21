@@ -8,7 +8,7 @@ from prisma.models import Match, MatchPlayer, User
 from prisma.types import MatchUpdateInput
 
 from core.models.game import BombState, GameState, GameStatus, PlayerState
-from server.utils.compression import compress_game_state, get_state_hash
+from core.serialization import get_state_hash, pack_game_state
 
 logger = logging.getLogger(__name__)
 
@@ -125,10 +125,10 @@ class GameService:
         packet_id = self.packet_counters.get(game_id, 0) + 1
         self.packet_counters[game_id] = packet_id
 
-        state_json = game.model_dump_json()
+        state_dict = game.model_dump()
 
         # Check if state actually changed using hash
-        current_hash = get_state_hash(state_json)
+        current_hash = get_state_hash(state_dict)
         last_hash = self.last_state_hashes.get(game_id, "")
 
         if current_hash == last_hash:
@@ -137,18 +137,18 @@ class GameService:
 
         self.last_state_hashes[game_id] = current_hash
 
-        # Compress with gzip for 70-90% size reduction
-        compressed, stats = compress_game_state(state_json)
+        # Pack with msgpack for better performance than JSON+gzip
+        packed, stats = pack_game_state(state_dict)
 
         ic(
-            f"State compression: {stats['original_size']}B -> {stats['compressed_size']}B "
-            f"({stats['compression_ratio']:.1f}% reduction)"
+            f"State packing: {stats['json_size']}B -> {stats['packed_size']}B "
+            f"({stats['size_reduction']:.1f}% reduction) via {stats['format']}"
         )
 
         dead: list[WebSocket] = []
         for ws in conns:
             try:
-                await ws.send_bytes(compressed)
+                await ws.send_bytes(packed)
             except Exception as e:
                 ic(f"Broadcast error: {type(e).__name__}")
                 logger.warning(f"Broadcast failed for {game_id}: {e}")
