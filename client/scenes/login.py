@@ -26,13 +26,13 @@ class LoginScene(BaseScene):
         self.cursor_blink = 0
         self.last_blink = pygame.time.get_ticks()
 
-        # Posições dos elementos
-        self.title_pos = (cx, cy - 200)
-        self.username_rect = pygame.Rect(cx - 175, cy - 65, 350, 50)
-        self.password_rect = pygame.Rect(cx - 175, cy - 15, 350, 50)
-        self.submit_rect = pygame.Rect(cx - 100, cy + 95, 200, 50)
-        self.toggle_rect = pygame.Rect(cx - 75, cy + 155, 150, 40)
-        self.back_rect = pygame.Rect(cx - 60, cy + 205, 120, 40)
+        # Posições dos elementos com espaçamento maior
+        self.title_pos = (cx, cy - 220)
+        self.username_rect = pygame.Rect(cx - 175, cy - 90, 350, 50)
+        self.password_rect = pygame.Rect(cx - 175, cy - 10, 350, 50)
+        self.submit_rect = pygame.Rect(cx - 100, cy + 80, 200, 50)
+        self.toggle_rect = pygame.Rect(cx - 75, cy + 140, 150, 40)
+        self.back_rect = pygame.Rect(cx - 60, cy + 190, 120, 40)
 
         # Estado visual dos botões
         self.submit_hover = False
@@ -40,9 +40,7 @@ class LoginScene(BaseScene):
         self.back_hover = False
 
         # Callbacks de auth (signup usa os mesmos callbacks do login)
-        auth = app.auth_service
-        auth.register_login_success_callback(self._on_auth_success)
-        auth.register_login_error_callback(self._on_auth_error)
+        self._setup_auth_callbacks()
 
         # Compatibilidade
         self.components = []
@@ -151,8 +149,12 @@ class LoginScene(BaseScene):
             self._render_error_message()
 
     def update(self) -> None:
-        # Captura erros de auth
         auth = self.app.auth_service
+
+        _ = auth.is_login_loading  # Trigger login callback processing
+        _ = auth.is_signup_loading  # Trigger signup callback processing
+        _ = auth.is_current_user_loading  # Trigger user fetch callback processing
+
         err = auth.get_signup_error() if self.is_signup_mode else auth.get_login_error()
         if err:
             self.error_message = err
@@ -193,10 +195,22 @@ class LoginScene(BaseScene):
     def _on_auth_error(self, message: str) -> None:
         self.error_message = message
 
+    def _setup_auth_callbacks(self) -> None:
+        """Registra callbacks de auth, garantindo que funcionem para login e signup."""
+        auth = self.app.auth_service
+        # Limpa callbacks antigos primeiro para evitar duplicatas
+        auth.on_login_success_callbacks.clear()
+        auth.on_login_error_callbacks.clear()
+        # Registra novos callbacks
+        auth.register_login_success_callback(self._on_auth_success)
+        auth.register_login_error_callback(self._on_auth_error)
+
     def _on_toggle_mode(self) -> None:
         self.is_signup_mode = not self.is_signup_mode
         # NÃO limpa campos para preservar dados
         self.error_message = ""
+        # Re-registra callbacks para garantir que funcionem corretamente
+        self._setup_auth_callbacks()
 
     def _render_title(self) -> None:
         """Renderiza título da tela."""
@@ -232,7 +246,7 @@ class LoginScene(BaseScene):
         if text or is_focused:
             font_label = pygame.font.SysFont("Arial", 14)
             label_surface = font_label.render(label, True, WHITE)
-            self.app.screen.blit(label_surface, (rect.x, rect.y - 25))
+            self.app.screen.blit(label_surface, (rect.x, rect.y - 30))
 
         # Texto
         font_text = pygame.font.SysFont("Arial", 18)
