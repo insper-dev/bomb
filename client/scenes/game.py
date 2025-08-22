@@ -81,7 +81,11 @@ class GameScene(BaseScene):
     def state(self) -> GameState | None:
         return self.service.state
 
-    def _on_game_end(self, status: GameStatus, winner: str | None) -> None: ...
+    def _on_game_end(self, status: GameStatus, winner: str | None) -> None:
+        """Callback chamado quando o jogo termina."""
+        print(f"[INFO] Jogo terminou - Status: {status}, Winner: {winner}")
+        self.service.stop()
+        self.app.current_scene = Scenes.GAME_OVER
 
     def _calc_margin(self, state: GameState) -> None:
         screen_w, screen_h = self.app.screen.get_size()

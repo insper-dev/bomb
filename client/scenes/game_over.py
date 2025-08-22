@@ -183,13 +183,17 @@ class GameOverScene(BaseScene):
             self.show_stats = True
             self.stats_reveal_time = current_time
 
-            # Adiciona partículas de celebração se houver vencedor
+            # Adiciona partículas de celebração se houver vencedor ou empate
             stats = self.game_over_service.match_stats
             if stats.winner_id:
                 winner_name = next(
                     (p.username for p in stats.players if p.user_id == stats.winner_id), "Vencedor"
                 )
                 self.winner_text = f"Vencedor: {winner_name}"
+                self._add_celebration_particles()
+            else:
+                # Empate
+                self.winner_text = "Empate!"
                 self._add_celebration_particles()
 
         # Adiciona partículas de fundo ocasionais
@@ -305,8 +309,8 @@ class GameOverScene(BaseScene):
         stats = self.game_over_service.match_stats
         cx, cy = self.app.screen_center
 
-        # Texto do vencedor (se houver)
-        if stats.winner_id and self.winner_text:
+        # Texto do resultado (vencedor ou empate)
+        if self.winner_text:
             font = pygame.font.SysFont("Arial", 32, bold=True)
 
             # Efeito pulse
@@ -319,7 +323,7 @@ class GameOverScene(BaseScene):
             self.app.screen.blit(text_surface, text_rect)
 
         # Duração da partida
-        y_offset = -20 if stats.winner_id else -60
+        y_offset = -20 if self.winner_text else -60
         if stats.duration_seconds is not None:
             mins, secs = divmod(stats.duration_seconds, 60)
             duration_text = f"Duração: {mins}:{secs:02d}"
