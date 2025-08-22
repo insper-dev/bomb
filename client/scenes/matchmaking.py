@@ -6,14 +6,7 @@ from prisma.partials import Opponent
 
 from client.scenes.base import BaseScene, Scenes
 from client.services.matchmaking import MatchmakingService
-from core.constants import (
-    ACCENT_BLUE,
-    ACCENT_GREEN,
-    ACCENT_YELLOW,
-    DARK_NAVY,
-    SLATE_GRAY,
-    WHITE,
-)
+from core.constants import ACCENT_BLUE, ACCENT_GREEN, ACCENT_YELLOW, DARK_NAVY, SLATE_GRAY, WHITE
 
 
 class MatchmakingScene(BaseScene):
@@ -21,6 +14,10 @@ class MatchmakingScene(BaseScene):
 
     def __init__(self, app) -> None:
         super().__init__(app)
+
+        # Limpa estado do jogo anterior antes de iniciar novo matchmaking
+        app.game_service.clear_game_state()
+
         self.matchmaking: MatchmakingService = app.matchmaking_service
         self.matchmaking.start()
 

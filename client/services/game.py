@@ -84,6 +84,11 @@ class GameService(ServiceBase):
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1)
 
+    def clear_game_state(self) -> None:
+        """Clear game state and match_id for new matchmaking."""
+        self.state = None
+        self.match_id = None
+
     def send_move(self, direction: PlayerDirectionState) -> None:
         """
         Send a movement event with client-side prediction and server reconciliation.
