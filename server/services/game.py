@@ -165,8 +165,6 @@ class GameService:
         y: int,
     ) -> None:
         ic(game_id, owner_id, x, y)
-        # TODO: definir o delay com base em powerups
-        delay = 2
         game = self.games.get(game_id)
         if not game or game.status != GameStatus.PLAYING:
             ic(
@@ -176,13 +174,19 @@ class GameService:
             )
             return
 
+        player = game.players.get(owner_id)
+        if not player:
+            ic(f"Player {owner_id} not found in game {game_id}")
+            return
+
         # TODO: criar bomba com powerups (só aumento de raio)
-        bomb = BombState(x=x, y=y)
+        bomb = BombState(x=x, y=y, radius=player.bomb_radius)
         ic(bomb)
-        game.players[owner_id].bombs.append(bomb)
-        delay = game.players[owner_id].bomb_time  # miliseconds
-        delay = delay / 1000  # convert to seconds for asyncio.sleep
-        logger.debug(f"Game {game_id}: bomb {bomb.id} placed by {owner_id}")
+        player.bombs.append(bomb)
+        delay = player.bomb_delay  # seconds
+        logger.debug(
+            f"Game {game_id}: bomb {bomb.id} placed by {owner_id} with radius {bomb.radius}"
+        )
         await self.broadcast_state(game_id)
         # ! possível memory leak.
         asyncio.create_task(self._increment_bombs_placed(game_id, owner_id))  # noqa: RUF006

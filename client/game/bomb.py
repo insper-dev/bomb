@@ -23,7 +23,7 @@ class Bomb:
             self.relative_position[1] * MODULE_SIZE + self.margin[1],
         )
         self.sprite_index = 0
-        self.tick = explosion_time // len(self.sprites)  # mileconds
+        self.tick = explosion_time * 1000 // len(self.sprites)  # mileconds
         self.explode = False
         self.id = id
         self._initialize_timer()

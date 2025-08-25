@@ -226,7 +226,7 @@ class GameScene(BaseScene):
                             (bomb.x, bomb.y),
                             self.margin,
                             bomb.id,
-                            explosion_time=pstate.bomb_time,
+                            explosion_time=pstate.bomb_delay,
                         )
                         self.bombs.append(new_bomb)
         for bomb in self.bombs:
