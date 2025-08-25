@@ -159,8 +159,14 @@ class GameService(ServiceBase):
         if not pstate:
             return
 
+        if pstate.bombs and len(pstate.bombs) >= pstate.max_bombs:
+            return  # Limite de bombas atingido
+
+        if any(b for b in pstate.bombs if b.x == pstate.x and b.y == pstate.y):
+            return  # Já há uma bomba na posição
+
         # Local update para responsividade
-        bomb = BombState(x=pstate.x, y=pstate.y)
+        bomb = BombState(x=pstate.x, y=pstate.y, radius=pstate.bomb_radius)
         self.state.add_bomb(user.id, bomb)
 
         # Envia para servidor com prioridade alta

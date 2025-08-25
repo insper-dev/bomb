@@ -35,7 +35,7 @@ class BombState(BaseModel):
     y: int
     placed_at: datetime = Field(default_factory=datetime.now)
     exploded_at: datetime | None = None
-    radius: int = 5
+    radius: int
 
     @field_validator("placed_at", "exploded_at", mode="before")
     @classmethod
@@ -59,6 +59,9 @@ class PlayerState(BaseModel):
     power_ups: list[str] = Field(default_factory=list)
     skin: PlayerType = Field(default_factory=lambda: random.choice(["carlitos", "rogerio"]))
     bombs: list[BombState] = Field(default_factory=list)
+    max_bombs: int = 2
+    bomb_delay: int = 2  # seconds
+    bomb_radius: int = 2
 
 
 def generate_map() -> list[list[MapBlockType]]:
@@ -185,7 +188,7 @@ class GameState(BaseModel):
     def add_bomb(self, player_id: str, bomb: BombState) -> None:
         """Add a bomb for a specific player"""
         # TODO: não permitir spammar bombas, a não ser que algum powerup permita.
-        ic(f"Adding bomb for player {player_id} at ({bomb.x}, {bomb.y})")
+        ic(f"Adding bomb for player {player_id} at ({bomb.x}, {bomb.y}) with radius {bomb.radius}")
         if player_id in self.players:
             self.players[player_id].bombs.append(bomb)
             ic(f"Player {player_id} now has {len(self.players[player_id].bombs)} active bombs")
