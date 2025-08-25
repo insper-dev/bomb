@@ -1,5 +1,6 @@
 import pygame
 
+from client.game.bomb import Bomb
 from client.game.player import Player
 from client.scenes.base import BaseScene, Scenes
 from client.services.game import GameService
@@ -9,8 +10,6 @@ from core.constants import (
     ACCENT_RED,
     ACCENT_YELLOW,
     BLOCKS,
-    BOMB_COKING,
-    BOMB_TIMER_RED,
     DARK_NAVY,
     EARTH,
     EXPLOSION_ORANGE,
@@ -54,6 +53,9 @@ class GameScene(BaseScene):
         self.players = {
             pid: Player(self.service, self.margin, pid) for pid in self.service.state.players
         }
+
+        # instancia bombas
+        self.bombs = []  # Lista para gerenciar bombas ativas
 
         # Cache para otimização de renderização
         self._map_cache = None
@@ -211,40 +213,24 @@ class GameScene(BaseScene):
 
     def _render_bombs_enhanced(self, screen: pygame.Surface) -> None:
         """Bombas com efeitos visuais melhorados."""
-        current_time = pygame.time.get_ticks()
+        # current_time = pygame.time.get_ticks()
 
         for pstate in self.state.players.values():
             for bomb in pstate.bombs:
                 if bomb.exploded_at is None:
-                    bx = self.margin[0] + bomb.x * MODULE_SIZE
-                    by = self.margin[1] + bomb.y * MODULE_SIZE
-
-                    # Frame animado mais rápido quando próximo da explosão
-                    time_factor = 100 if current_time % 1000 > 800 else 200
-                    frame = (current_time // time_factor) % len(BOMB_COKING)
-
-                    # Efeito de pulsação
-                    if current_time % 1000 > 800:  # Últimos 200ms
-                        pulse = abs((current_time % 200) - 100) / 100.0
-                        glow_radius = int(MODULE_SIZE / 2 + pulse * 10)
-                        glow_surface = pygame.Surface(
-                            (glow_radius * 2, glow_radius * 2), pygame.SRCALPHA
+                    if not any(
+                        b.position[0] == bomb.x and b.position[1] == bomb.y for b in self.bombs
+                    ):
+                        new_bomb = Bomb(
+                            screen,
+                            (bomb.x, bomb.y),
+                            self.margin,
+                            bomb.id,
+                            explosion_time=pstate.bomb_time,
                         )
-                        pygame.draw.circle(
-                            glow_surface,
-                            (*BOMB_TIMER_RED[:3], 80),
-                            (glow_radius, glow_radius),
-                            glow_radius,
-                        )
-                        screen.blit(
-                            glow_surface,
-                            (
-                                bx + MODULE_SIZE // 2 - glow_radius,
-                                by + MODULE_SIZE // 2 - glow_radius,
-                            ),
-                        )
-
-                    screen.blit(BOMB_COKING[frame], (bx, by))
+                        self.bombs.append(new_bomb)
+        for bomb in self.bombs:
+            bomb.render()
 
     def _render_explosions_enhanced(self, screen: pygame.Surface) -> None:
         """Explosões com efeitos de partículas melhorados."""
@@ -258,6 +244,8 @@ class GameScene(BaseScene):
                 if bomb.exploded_at:
                     cx = self.margin[0] + bomb.x * MODULE_SIZE
                     cy = self.margin[1] + bomb.y * MODULE_SIZE
+
+                    self.bombs = [b for b in self.bombs if b.id != bomb.id]
 
                     # Centro da explosão com glow
                     glow_size = MODULE_SIZE + 20

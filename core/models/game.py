@@ -59,6 +59,7 @@ class PlayerState(BaseModel):
     power_ups: list[str] = Field(default_factory=list)
     skin: PlayerType = Field(default_factory=lambda: random.choice(["carlitos", "rogerio"]))
     bombs: list[BombState] = Field(default_factory=list)
+    bomb_time: int = 2000  # milisseconds
 
 
 def generate_map() -> list[list[MapBlockType]]:

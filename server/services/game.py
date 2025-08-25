@@ -180,6 +180,8 @@ class GameService:
         bomb = BombState(x=x, y=y)
         ic(bomb)
         game.players[owner_id].bombs.append(bomb)
+        delay = game.players[owner_id].bomb_time  # miliseconds
+        delay = delay / 1000  # convert to seconds for asyncio.sleep
         logger.debug(f"Game {game_id}: bomb {bomb.id} placed by {owner_id}")
         await self.broadcast_state(game_id)
         # ! possível memory leak.

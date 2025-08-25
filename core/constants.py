@@ -245,10 +245,6 @@ BOMB_COKING: list[pygame.Surface] = [
         pygame.image.load(BOMB_PATH / "bomb_state_4.png"),
         (MODULE_SIZE, MODULE_SIZE),
     ),
-    pygame.transform.scale(
-        pygame.image.load(BOMB_PATH / "bomb_state_5.png"),
-        (MODULE_SIZE, MODULE_SIZE),
-    ),
 ]
 
 # Particles
