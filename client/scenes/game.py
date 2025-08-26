@@ -145,8 +145,8 @@ class GameScene(BaseScene):
         # 1) Mapa com cache otimizado
         self._render_map_optimized(screen)
 
-        # 2) Grade sutil
-        self._render_subtle_grid(screen)
+        # 2) Grade sutil --removed
+        # self._render_subtle_grid(screen)
 
         # 3) Jogadores com interpolação
         for player in self.players.values():
@@ -202,7 +202,11 @@ class GameScene(BaseScene):
                 rect = pygame.Rect(x * MODULE_SIZE, y * MODULE_SIZE, MODULE_SIZE, MODULE_SIZE)
                 sprite = sprites.get(cell)
                 if sprite:
-                    cache_surface.blit(sprite, rect)
+                    if isinstance(sprite, pygame.Surface):
+                        cache_surface.blit(sprite, rect)
+                    else:
+                        color = sprite
+                        pygame.draw.rect(cache_surface, color, rect)
 
         self._map_cache = cache_surface
 
