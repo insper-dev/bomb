@@ -210,7 +210,20 @@ BLOCKS_PATH = IMAGES_PATH / "blocks"
 
 DESTROYABLE_BLOCKS: list[str] = ["caixa", "areia"]
 
-BLOCKS: dict[GameTheme, dict[MapBlockType, pygame.Surface]] = {
+FLOORS_COLORS: dict[str, pygame.Color] = {
+    "desert-light": pygame.Color(239, 191, 143),
+    "desert-dark": pygame.Color(168, 113, 59),
+    "shed-light": pygame.Color(23, 23, 23),
+    "shed-dark": pygame.Color(5, 5, 5),
+}
+
+
+FLOORS: dict[GameTheme, list[pygame.Color]] = {
+    GameTheme.DESERT: [FLOORS_COLORS["desert-light"], FLOORS_COLORS["desert-dark"]],
+    GameTheme.SHED: [FLOORS_COLORS["shed-light"], FLOORS_COLORS["shed-dark"]],
+}
+
+BLOCKS: dict[GameTheme, dict[MapBlockType, pygame.Surface | pygame.Color]] = {
     GameTheme.DESERT: {
         MapBlockType.BREAKABLE: pygame.transform.scale(
             pygame.image.load(BLOCKS_PATH / "Areia.png"), (MODULE_SIZE, MODULE_SIZE)
@@ -218,7 +231,7 @@ BLOCKS: dict[GameTheme, dict[MapBlockType, pygame.Surface]] = {
         MapBlockType.UNBREAKABLE: pygame.transform.scale(
             pygame.image.load(BLOCKS_PATH / "Diamante.png"), (MODULE_SIZE, MODULE_SIZE)
         ),
-        MapBlockType.EMPTY: pygame.Surface((MODULE_SIZE, MODULE_SIZE), pygame.SRCALPHA),
+        MapBlockType.EMPTY: FLOORS[GameTheme.DESERT][1],
     },
     GameTheme.SHED: {
         MapBlockType.BREAKABLE: pygame.transform.scale(
@@ -227,7 +240,7 @@ BLOCKS: dict[GameTheme, dict[MapBlockType, pygame.Surface]] = {
         MapBlockType.UNBREAKABLE: pygame.transform.scale(
             pygame.image.load(BLOCKS_PATH / "Metal.png"), (MODULE_SIZE, MODULE_SIZE)
         ),
-        MapBlockType.EMPTY: pygame.Surface((MODULE_SIZE, MODULE_SIZE), pygame.SRCALPHA),
+        MapBlockType.EMPTY: FLOORS[GameTheme.SHED][0],
     },
 }
 
