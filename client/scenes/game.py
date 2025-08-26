@@ -18,9 +18,10 @@ from core.constants import (
     MODULE_SIZE,
     PLAYERS_MAP,
     SLATE_GRAY,
+    SONGS,
     WHITE,
 )
-from core.models.game import UNDESTOYABLE_BOXES, GameState, GameStatus, MapBlockType
+from core.models.game import GameState, GameStatus, MapBlockType
 
 
 class GameScene(BaseScene):
@@ -57,6 +58,14 @@ class GameScene(BaseScene):
         # instancia bombas
         self.bombs = []  # Lista para gerenciar bombas ativas
 
+        # Tema atual do jogo
+        self.theme = self.service.state.game_theme
+
+        # Loading music
+        pygame.mixer.music.load(SONGS[self.theme])
+        pygame.mixer.music.set_volume(0.3)
+        pygame.mixer.music.play(-1)  # Loop infinito
+
         # Cache para otimização de renderização
         self._map_cache = None
         self._grid_cache = None
@@ -87,6 +96,7 @@ class GameScene(BaseScene):
         """Callback chamado quando o jogo termina."""
         print(f"[INFO] Jogo terminou - Status: {status}, Winner: {winner}")
         self.service.stop()
+        pygame.mixer.music.stop()
         self.app.current_scene = Scenes.GAME_OVER
 
     def _calc_margin(self, state: GameState) -> None:
@@ -135,8 +145,8 @@ class GameScene(BaseScene):
         # 1) Mapa com cache otimizado
         self._render_map_optimized(screen)
 
-        # 2) Grade sutil
-        self._render_subtle_grid(screen)
+        # 2) Grade sutil --removed
+        # self._render_subtle_grid(screen)
 
         # 3) Jogadores com interpolação
         for player in self.players.values():
@@ -177,15 +187,26 @@ class GameScene(BaseScene):
         if not self.state:
             return
 
+        if not self.theme:
+            return
+
+        sprites = BLOCKS.get(self.theme)
+        if not sprites:
+            return
+
         rows, cols = len(self.state.map), len(self.state.map[0])
         cache_surface = pygame.Surface((cols * MODULE_SIZE, rows * MODULE_SIZE))
 
         for y, row in enumerate(self.state.map):
             for x, cell in enumerate(row):
                 rect = pygame.Rect(x * MODULE_SIZE, y * MODULE_SIZE, MODULE_SIZE, MODULE_SIZE)
-                sprite = BLOCKS.get(cell)
+                sprite = sprites.get(cell)
                 if sprite:
-                    cache_surface.blit(sprite, rect)
+                    if isinstance(sprite, pygame.Surface):
+                        cache_surface.blit(sprite, rect)
+                    else:
+                        color = sprite
+                        pygame.draw.rect(cache_surface, color, rect)
 
         self._map_cache = cache_surface
 
@@ -269,14 +290,11 @@ class GameScene(BaseScene):
                                 or ty < 0
                                 or ty >= rows
                                 or tx >= cols
-                                or self.state.map[ty][tx] in UNDESTOYABLE_BOXES
+                                or self.state.map[ty][tx] == MapBlockType.UNBREAKABLE
                             ):
                                 break
                             tiles_by_dir[i].append((tx, ty))
-                            if self.state.map[ty][tx] in {
-                                MapBlockType.WOODEN_BOX,
-                                MapBlockType.SAND_BOX,
-                            }:
+                            if self.state.map[ty][tx] == MapBlockType.BREAKABLE:
                                 break
 
                     for dir_idx, tiles in tiles_by_dir.items():
