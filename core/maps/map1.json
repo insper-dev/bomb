@@ -1,10 +1,4 @@
 {
-  "tileset": {
-    "name": "The Bunker Tileset",
-    "destroyable": "WOODEN_BOX",
-    "undestroyable": "METAL_BOX",
-    "background": "bunker_background"
-  },
   "map": {
     "rows": 11,
     "columns": 13,

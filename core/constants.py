@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pygame
 
-from core.models.game import MapBlockType
+from core.models.game import GameTheme, MapBlockType
 from core.types import (
     ComponentSize,
     ComponentType,
@@ -210,20 +210,32 @@ BLOCKS_PATH = IMAGES_PATH / "blocks"
 
 DESTROYABLE_BLOCKS: list[str] = ["caixa", "areia"]
 
-BLOCKS: dict[MapBlockType, pygame.Surface] = {
-    MapBlockType.SAND_BOX: pygame.transform.scale(
-        pygame.image.load(BLOCKS_PATH / "Areia.png"), (MODULE_SIZE, MODULE_SIZE)
-    ),
-    MapBlockType.WOODEN_BOX: pygame.transform.scale(
-        pygame.image.load(BLOCKS_PATH / "Caixa.png"), (MODULE_SIZE, MODULE_SIZE)
-    ),
-    MapBlockType.DIAMOND_BOX: pygame.transform.scale(
-        pygame.image.load(BLOCKS_PATH / "Diamante.png"), (MODULE_SIZE, MODULE_SIZE)
-    ),
-    MapBlockType.METAL_BOX: pygame.transform.scale(
-        pygame.image.load(BLOCKS_PATH / "Metal.png"), (MODULE_SIZE, MODULE_SIZE)
-    ),
-    MapBlockType.EMPTY: pygame.Surface((MODULE_SIZE, MODULE_SIZE), pygame.SRCALPHA),
+BLOCKS: dict[GameTheme, dict[MapBlockType, pygame.Surface]] = {
+    GameTheme.DESERT: {
+        MapBlockType.BREAKABLE: pygame.transform.scale(
+            pygame.image.load(BLOCKS_PATH / "Areia.png"), (MODULE_SIZE, MODULE_SIZE)
+        ),
+        MapBlockType.UNBREAKABLE: pygame.transform.scale(
+            pygame.image.load(BLOCKS_PATH / "Diamante.png"), (MODULE_SIZE, MODULE_SIZE)
+        ),
+        MapBlockType.EMPTY: pygame.Surface((MODULE_SIZE, MODULE_SIZE), pygame.SRCALPHA),
+    },
+    GameTheme.SHED: {
+        MapBlockType.BREAKABLE: pygame.transform.scale(
+            pygame.image.load(BLOCKS_PATH / "Caixa.png"), (MODULE_SIZE, MODULE_SIZE)
+        ),
+        MapBlockType.UNBREAKABLE: pygame.transform.scale(
+            pygame.image.load(BLOCKS_PATH / "Metal.png"), (MODULE_SIZE, MODULE_SIZE)
+        ),
+        MapBlockType.EMPTY: pygame.Surface((MODULE_SIZE, MODULE_SIZE), pygame.SRCALPHA),
+    },
+}
+
+# Songs
+SONGS_PATH = ASSETS_PATH / "songs"
+SONGS: dict[GameTheme, Path] = {
+    GameTheme.DESERT: SONGS_PATH / "desert_theme.mpeg",
+    GameTheme.SHED: SONGS_PATH / "shed_theme.mpeg",
 }
 
 # Bomb
