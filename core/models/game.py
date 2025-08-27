@@ -17,15 +17,43 @@ class GameStatus(str, Enum):
 
 
 class GameTheme(str, Enum):
+    """
+    Temas disponíveis para o mapa do jogo:\n
+    DESERT: Tema desértico com cores quentes e elementos de areia.\n
+    SHED: Tema de galpão com elementos rústicos e industriais.\n
+
+    """
+
     DESERT = "desert"
     SHED = "shed"
 
 
 class MapBlockType(str, Enum):
+    """
+    Tipos de blocos que podem compor o mapa do jogo.\n
+    EMPTY: Espaço vazio onde os jogadores podem se mover livremente.\n
+    BREAKABLE: Bloco que pode ser destruído por uma explosão de bomba.\n
+    UNBREAKABLE: Bloco indestrutível que serve como obstáculo permanente.\n
+    """
+
     EMPTY = "empty"
     BREAKABLE = "breakable"
     UNBREAKABLE = "unbreakable"
     POWER_UP = "power_up"
+
+
+class PowerUpType(str, Enum):
+    """_summary_
+
+    Tipos de power-ups disponíveis no jogo.\n
+    EXTRA_BOMB: Permite ao jogador colocar uma bomba extra além do limite padrão.\n
+    INCREASE_RADIUS: Aumenta o raio de explosão das bombas do jogador.\n
+    SHIELD: Concede um escudo temporário que protege o jogador de uma explosão\n
+    """
+
+    EXTRA_BOMB = "extra_bomb"
+    INCREASE_RADIUS = "increase_radius"
+    SHIELD = "shield"
 
 
 class BombState(BaseModel):

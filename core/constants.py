@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pygame
 
-from core.models.game import GameTheme, MapBlockType
+from core.models.game import GameTheme, MapBlockType, PowerUpType
 from core.types import (
     ComponentSize,
     ComponentType,
@@ -242,6 +242,22 @@ BLOCKS: dict[GameTheme, dict[MapBlockType, pygame.Surface | pygame.Color]] = {
         ),
         MapBlockType.EMPTY: FLOORS[GameTheme.SHED][0],
     },
+}
+
+POWER_UPS_PATH = IMAGES_PATH / "power_ups"
+POWER_UPS: dict[PowerUpType, pygame.Surface] = {
+    PowerUpType.EXTRA_BOMB: pygame.transform.scale(
+        pygame.image.load(POWER_UPS_PATH / "bomb.png"),
+        (MODULE_SIZE, MODULE_SIZE),
+    ),
+    PowerUpType.SHIELD: pygame.transform.scale(
+        pygame.image.load(POWER_UPS_PATH / "shield.png"),
+        (MODULE_SIZE, MODULE_SIZE),
+    ),
+    PowerUpType.INCREASE_RADIUS: pygame.transform.scale(
+        pygame.image.load(POWER_UPS_PATH / "thunder.png"),
+        (MODULE_SIZE, MODULE_SIZE),
+    ),
 }
 
 # Songs

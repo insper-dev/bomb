@@ -22,6 +22,7 @@ class BaseScene(ABC):
         self.app = app
         self.next_scene: BaseScene | None = None
         self.components = []
+        pygame.mixer.music.stop()
 
     @abstractmethod
     def handle_event(self, event: pygame.event.Event) -> None:

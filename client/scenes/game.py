@@ -1,3 +1,5 @@
+from math import sin
+
 import pygame
 
 from client.game.bomb import Bomb
@@ -17,6 +19,7 @@ from core.constants import (
     LIGHT_GRAY,
     MODULE_SIZE,
     PLAYERS_MAP,
+    POWER_UPS,
     SLATE_GRAY,
     SONGS,
     WHITE,
@@ -96,13 +99,12 @@ class GameScene(BaseScene):
         """Callback chamado quando o jogo termina."""
         print(f"[INFO] Jogo terminou - Status: {status}, Winner: {winner}")
         self.service.stop()
-        pygame.mixer.music.stop()
         self.app.current_scene = Scenes.GAME_OVER
 
     def _calc_margin(self, state: GameState) -> None:
         screen_w, screen_h = self.app.screen.get_size()
-        w_tiles = len(state.map[0])
-        h_tiles = len(state.map)
+        w_tiles = state.map.width
+        h_tiles = state.map.height
 
         total_map_h = h_tiles * MODULE_SIZE
         x = (screen_w - w_tiles * MODULE_SIZE) // 2
@@ -153,13 +155,16 @@ class GameScene(BaseScene):
             player.update()
             player.render()
 
-        # 4) Bombas com efeitos melhorados
+        # 4 Renderiza power-ups
+        self._render_power_ups(screen)
+
+        # 5) Bombas com efeitos melhorados
         self._render_bombs_enhanced(screen)
 
-        # 5) Explosões com partículas melhoradas
+        # 6) Explosões com partículas melhoradas
         self._render_explosions_enhanced(screen)
 
-        # 6) FPS counter (debug)
+        # 7) FPS counter (debug)
         if self.show_fps:
             self._render_fps(screen)
 
@@ -194,10 +199,10 @@ class GameScene(BaseScene):
         if not sprites:
             return
 
-        rows, cols = len(self.state.map), len(self.state.map[0])
+        rows, cols = self.state.map.height, self.state.map.width
         cache_surface = pygame.Surface((cols * MODULE_SIZE, rows * MODULE_SIZE))
 
-        for y, row in enumerate(self.state.map):
+        for y, row in enumerate(self.state.map.layout):
             for x, cell in enumerate(row):
                 rect = pygame.Rect(x * MODULE_SIZE, y * MODULE_SIZE, MODULE_SIZE, MODULE_SIZE)
                 sprite = sprites.get(cell)
@@ -215,7 +220,7 @@ class GameScene(BaseScene):
         if not self.state:
             return
 
-        rows, cols = len(self.state.map), len(self.state.map[0])
+        rows, cols = self.state.map.height, self.state.map.width
         grid_color = (*SLATE_GRAY[:3], 60)  # Semi-transparente
 
         # Linhas horizontais
@@ -258,7 +263,7 @@ class GameScene(BaseScene):
         if not self.state:
             return
 
-        rows, cols = len(self.state.map), len(self.state.map[0])
+        rows, cols = self.state.map.height, self.state.map.width
 
         for pstate in self.state.players.values():
             for bomb in pstate.bombs:
@@ -290,11 +295,11 @@ class GameScene(BaseScene):
                                 or ty < 0
                                 or ty >= rows
                                 or tx >= cols
-                                or self.state.map[ty][tx] == MapBlockType.UNBREAKABLE
+                                or self.state.map.layout[ty][tx] == MapBlockType.UNBREAKABLE
                             ):
                                 break
                             tiles_by_dir[i].append((tx, ty))
-                            if self.state.map[ty][tx] == MapBlockType.BREAKABLE:
+                            if self.state.map.layout[ty][tx] == MapBlockType.BREAKABLE:
                                 break
 
                     for dir_idx, tiles in tiles_by_dir.items():
@@ -325,6 +330,20 @@ class GameScene(BaseScene):
 
                             sprite = EXPLOSION_PARTICLES[part][fixed_dir_idx]
                             screen.blit(sprite, (px, py))
+
+    def _render_power_ups(self, screen: pygame.Surface) -> None:
+        """Renderiza power-ups no mapa."""
+        if not self.state:
+            return
+
+        floating_var = sin(pygame.time.get_ticks() * 0.005) * 5
+
+        for pu_obj in self.state.map.objects:
+            if self.state.map.layout[pu_obj.y][pu_obj.x] == MapBlockType.EMPTY:
+                sprite = POWER_UPS[pu_obj.object]
+                px = self.margin[0] + pu_obj.x * MODULE_SIZE
+                py = self.margin[1] + pu_obj.y * MODULE_SIZE + floating_var
+                screen.blit(sprite, (px, py))
 
     def _render_fps(self, screen: pygame.Surface) -> None:
         """Contador de FPS avançado com métricas detalhadas."""
@@ -466,7 +485,7 @@ class GameScene(BaseScene):
         # 3. Hash do estado do mapa para detecção de mudanças finas
         import hashlib
 
-        map_str = str(self.state.map)
+        map_str = str(self.state.map.layout)
         current_hash = hashlib.md5(map_str.encode()).hexdigest()
         if current_hash != self._last_state_hash:
             self._need_map_refresh = True
