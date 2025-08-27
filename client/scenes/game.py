@@ -19,7 +19,6 @@ from core.constants import (
     LIGHT_GRAY,
     MODULE_SIZE,
     PLAYERS_MAP,
-    POWER_UPS,
     SLATE_GRAY,
     SONGS,
     WHITE,
@@ -103,8 +102,8 @@ class GameScene(BaseScene):
 
     def _calc_margin(self, state: GameState) -> None:
         screen_w, screen_h = self.app.screen.get_size()
-        w_tiles = state.map.width
-        h_tiles = state.map.height
+        w_tiles = len(self.state.map[0])
+        h_tiles = len(self.state.map)
 
         total_map_h = h_tiles * MODULE_SIZE
         x = (screen_w - w_tiles * MODULE_SIZE) // 2
@@ -199,10 +198,10 @@ class GameScene(BaseScene):
         if not sprites:
             return
 
-        rows, cols = self.state.map.height, self.state.map.width
+        rows, cols = len(self.state.map), len(self.state.map[0])
         cache_surface = pygame.Surface((cols * MODULE_SIZE, rows * MODULE_SIZE))
 
-        for y, row in enumerate(self.state.map.layout):
+        for y, row in enumerate(self.state.map):
             for x, cell in enumerate(row):
                 rect = pygame.Rect(x * MODULE_SIZE, y * MODULE_SIZE, MODULE_SIZE, MODULE_SIZE)
                 sprite = sprites.get(cell)
@@ -220,7 +219,7 @@ class GameScene(BaseScene):
         if not self.state:
             return
 
-        rows, cols = self.state.map.height, self.state.map.width
+        rows, cols = len(self.state.map), len(sestate.map[0])
         grid_color = (*SLATE_GRAY[:3], 60)  # Semi-transparente
 
         # Linhas horizontais
@@ -263,7 +262,7 @@ class GameScene(BaseScene):
         if not self.state:
             return
 
-        rows, cols = self.state.map.height, self.state.map.width
+        rows, cols = len(self.state.map), len(self.state.map[0])
 
         for pstate in self.state.players.values():
             for bomb in pstate.bombs:
@@ -295,11 +294,11 @@ class GameScene(BaseScene):
                                 or ty < 0
                                 or ty >= rows
                                 or tx >= cols
-                                or self.state.map.layout[ty][tx] == MapBlockType.UNBREAKABLE
+                                or self.state.map[ty][tx] == MapBlockType.UNBREAKABLE
                             ):
                                 break
                             tiles_by_dir[i].append((tx, ty))
-                            if self.state.map.layout[ty][tx] == MapBlockType.BREAKABLE:
+                            if self.state.map[ty][tx] == MapBlockType.BREAKABLE:
                                 break
 
                     for dir_idx, tiles in tiles_by_dir.items():
@@ -337,13 +336,6 @@ class GameScene(BaseScene):
             return
 
         floating_var = sin(pygame.time.get_ticks() * 0.005) * 5
-
-        for pu_obj in self.state.map.objects:
-            if self.state.map.layout[pu_obj.y][pu_obj.x] == MapBlockType.EMPTY:
-                sprite = POWER_UPS[pu_obj.object]
-                px = self.margin[0] + pu_obj.x * MODULE_SIZE
-                py = self.margin[1] + pu_obj.y * MODULE_SIZE + floating_var
-                screen.blit(sprite, (px, py))
 
     def _render_fps(self, screen: pygame.Surface) -> None:
         """Contador de FPS avançado com métricas detalhadas."""
@@ -485,7 +477,7 @@ class GameScene(BaseScene):
         # 3. Hash do estado do mapa para detecção de mudanças finas
         import hashlib
 
-        map_str = str(self.state.map.layout)
+        map_str = str(self.state.map)
         current_hash = hashlib.md5(map_str.encode()).hexdigest()
         if current_hash != self._last_state_hash:
             self._need_map_refresh = True
