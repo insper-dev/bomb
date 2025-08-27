@@ -54,6 +54,10 @@ class Player:
         self.correction_threshold = 1.5  # Distância para forçar correção
         self.last_correction_time = 0
 
+        # Outline pulsante para jogador local
+        self.outline_timer = 0
+        self.outline_interval = 500  # Intervalo de pulsação
+
         # Inicializa posições visuais com posição inicial do servidor
         self._initialize_visual_position()
 
@@ -285,9 +289,9 @@ class Player:
         current = self.app.auth_service.current_user
         is_local = current and current.id == self.player_id
 
-        # Renderização com efeitos
-        if is_local:
-            self._render_local_player_effects(x_px, y_px)
+        # Renderização com efeitos -- desativado por enquanto
+        # if is_local:
+        #     self._render_local_player_effects(x_px, y_px)
 
         # Sprite principal
         self.app.screen.blit(sprite, (x_px, y_px))
@@ -295,8 +299,10 @@ class Player:
         # Contorno para jogador local
         if is_local:
             self._render_local_player_outline(sprite, x_px, y_px)
+        else:
+            self._render_enemy_outline(sprite, x_px, y_px)
 
-        # Indicadores de status
+        # Indicadores de status -- desativado por enquanto
         self._render_status_indicators(x_px, y_px, ps)
 
     def _render_local_player_effects(self, x_px: float, y_px: float) -> None:
@@ -315,6 +321,15 @@ class Player:
 
         self.app.screen.blit(shadow_surface, (x_px - 3, y_px + 1))
 
+    def __get_outline_color(self, cor, sprite) -> pygame.Surface:
+        mask = pygame.mask.from_surface(sprite)
+        surface = pygame.Surface((mask.get_size()), pygame.SRCALPHA)
+        surface.fill((0, 0, 0, 0))  # Cor dour
+        outline = mask.outline()
+        for point in outline:
+            surface.set_at(point, cor)
+        return surface
+
     def _render_local_player_outline(
         self, sprite: pygame.Surface, x_px: float, y_px: float
     ) -> None:
@@ -323,15 +338,31 @@ class Player:
 
         # Efeito pulsante
         current_time = pygame.time.get_ticks()
-        pulse = abs((current_time % 1500) - 750) / 750.0
-        gold_intensity = int(180 + 75 * pulse)
+        pulse = abs((current_time % 1250) - 750) / 750.0
+        blue_intensity = int(180 + 75 * pulse)
 
         # Gradiente dourado
-        gold_color = (gold_intensity, int(gold_intensity * 0.85), int(gold_intensity * 0.1))
+        blue_color = (blue_intensity * 0.1, int(blue_intensity * 0.1), int(blue_intensity))
 
-        # Contorno duplo para melhor visibilidade
-        pygame.draw.rect(self.app.screen, (40, 40, 40), rect.inflate(6, 6), width=1)
-        pygame.draw.rect(self.app.screen, gold_color, rect.inflate(4, 4), width=2)
+        # Contorno Azul
+        outline = self.__get_outline_color(blue_color, sprite)
+        self.app.screen.blit(outline, rect.topleft)
+
+    def _render_enemy_outline(self, sprite: pygame.Surface, x_px: float, y_px: float) -> None:
+        """Renderiza contorno vermelho para jogadores inimigos."""
+        rect = sprite.get_rect(topleft=(x_px, y_px))
+
+        # Efeito pulsante
+        current_time = pygame.time.get_ticks()
+        pulse = abs((current_time % 1250) - 750) / 750.0
+        red_intensity = int(180 + 75 * pulse)
+
+        # Gradiente vermelho
+        red_color = (red_intensity, int(red_intensity * 0.1), int(red_intensity * 0.1))
+
+        # Red mask outline
+        outline = self.__get_outline_color(red_color, sprite)
+        self.app.screen.blit(outline, rect.topleft)
 
     def _render_status_indicators(self, x_px: float, y_px: float, ps: PlayerState) -> None:
         """Renderiza indicadores de status do jogador."""

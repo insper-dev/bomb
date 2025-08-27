@@ -16,17 +16,16 @@ class GameStatus(str, Enum):
     WINNER = "winner"
 
 
+class GameTheme(str, Enum):
+    DESERT = "desert"
+    SHED = "shed"
+
+
 class MapBlockType(str, Enum):
     EMPTY = "empty"
-    SAND_BOX = "sand_box"
-    WOODEN_BOX = "wooden_box"
-    DIAMOND_BOX = "diamond_box"
-    METAL_BOX = "metal_box"
+    BREAKABLE = "breakable"
+    UNBREAKABLE = "unbreakable"
     POWER_UP = "power_up"
-
-
-DESTROYABLE_BOXES = [MapBlockType.WOODEN_BOX, MapBlockType.SAND_BOX]
-UNDESTOYABLE_BOXES = [MapBlockType.DIAMOND_BOX, MapBlockType.METAL_BOX]
 
 
 class BombState(BaseModel):
@@ -64,16 +63,16 @@ class PlayerState(BaseModel):
     bomb_radius: int = 2
 
 
-def generate_map() -> list[list[MapBlockType]]:
-    # TODO: "geração" de mapa para um arquivo estático, só randomiza o tipo de bloco e boa.
-    maps_path = "core/maps"
-    base_map_path = f"{maps_path}/base_map.json"
-    alt_map_path = f"{maps_path}/alt_map.json"
+def get_theme() -> GameTheme:
+    return random.choice(list(GameTheme))
 
-    map_path = random.choice([base_map_path, alt_map_path])
+
+def generate_map(theme) -> list[list[MapBlockType]]:
+    maps_path = "core/maps"
+    maps_path += "/map1.json"  # Default map
 
     # Load base map
-    with open(map_path) as f:
+    with open(maps_path) as f:
         base_map_data = json.load(f)
 
     # Map structure
@@ -81,11 +80,6 @@ def generate_map() -> list[list[MapBlockType]]:
     # columns, rows, layout
     # layout is a 2D array of characters representing block types
     # D = destructible, U = undestructible, E = empty, R = random (D or E)
-
-    # Tileset structure
-    tileset = base_map_data["tileset"]
-    # styles and sprites for the map
-    # name, destroyable, undestroyable, background
 
     width = map.get("columns", 13)  # Default width for bomberman-like games
     height = map.get("rows", 11)  # Default height for bomberman-like games
@@ -111,11 +105,11 @@ def generate_map() -> list[list[MapBlockType]]:
                     ["D", "E"]
                 )  # Randomly choose between destructible or empty
             if block_type == "D":
-                block = getattr(MapBlockType, tileset["destroyable"])
+                block = MapBlockType.BREAKABLE
                 destructible_count += 1
             elif block_type == "U":
                 indestructible_count += 1
-                block = getattr(MapBlockType, tileset["undestroyable"])
+                block = MapBlockType.UNBREAKABLE
             else:
                 block = MapBlockType.EMPTY
             map_grid[y][x] = block
@@ -139,6 +133,7 @@ def generate_map() -> list[list[MapBlockType]]:
 class GameState(BaseModel):
     game_id: str
     players: dict[str, PlayerState] = Field(default_factory=dict)
+    game_theme: GameTheme = Field(default_factory=get_theme)  # Random theme
     map: list[list[MapBlockType]] = Field(default_factory=generate_map)
     status: GameStatus = GameStatus.PLAYING
     winner_id: str | None = None
@@ -260,8 +255,8 @@ class GameState(BaseModel):
                 cell = self.map[ny][nx]
                 ic(f"{direction_name} step {step}: ({nx}, {ny}) - {cell}")
 
-                # se for indestrutível, para esta direção
-                if cell in UNDESTOYABLE_BOXES:
+                # se for indestrutível, para nesta direção
+                if cell == MapBlockType.UNBREAKABLE:
                     ic(f"{direction_name}: Blocked by {cell} at ({nx}, {ny})")
                     break
 
@@ -269,7 +264,7 @@ class GameState(BaseModel):
                 affected.append((nx, ny))
 
                 # se for quebrável, remove e para nesta direção
-                if cell in DESTROYABLE_BOXES:
+                if cell == MapBlockType.BREAKABLE:
                     old_cell = self.map[ny][nx]
                     self.map[ny][nx] = MapBlockType.EMPTY
                     destroyed_blocks.append((nx, ny, old_cell))
