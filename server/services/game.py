@@ -7,7 +7,7 @@ from icecream import ic
 from prisma.models import Match, MatchPlayer, User
 from prisma.types import MatchUpdateInput
 
-from core.models.game import BombState, GameState, GameStatus, PlayerState
+from core.models.game import BombState, GameState, GameStatus, PlayerState, PowerUpType
 from core.serialization import get_state_hash, pack_game_state
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class GameService:
         ]  # type: ignore [fé que o ID existe.]
 
         game = GameState(game_id=game_id, time_start=timeout)
-        positions = [(1, 1), (len(game.map[0]) - 2, len(game.map) - 2)]
+        positions = [(1, 1), (game.map_state.width - 2, game.map_state.height - 2)]
         ic(positions)
 
         for i, player in enumerate(players):
@@ -247,6 +247,12 @@ class GameService:
 
                 # 6. Verifica hits e processa fim de jogo se necessário
                 hits = [pid for pid, p in game.players.items() if (p.x, p.y) in affected_tiles]
+                for ple in hits:
+                    player = game.players.get(ple)
+                    if player and "shield" in player.power_ups:
+                        game.remove_powerup(ple, PowerUpType.SHIELD)
+                        hits.remove(ple)
+                        ic(f"Player {ple} blocked explosion with SHIELD")
                 ic("Players hit:", hits)
 
                 # Só encerra o jogo se alguém foi atingido

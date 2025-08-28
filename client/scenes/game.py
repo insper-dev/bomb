@@ -19,11 +19,12 @@ from core.constants import (
     LIGHT_GRAY,
     MODULE_SIZE,
     PLAYERS_MAP,
+    POWER_UPS,
     SLATE_GRAY,
     SONGS,
     WHITE,
 )
-from core.models.game import GameState, GameStatus, MapBlockType
+from core.models.game import GameState, GameStatus, MapBlockType, PowerUpType
 
 
 class GameScene(BaseScene):
@@ -115,8 +116,11 @@ class GameScene(BaseScene):
 
     def _calc_margin(self, state: GameState) -> None:
         screen_w, screen_h = self.app.screen.get_size()
-        w_tiles = len(self.state.map[0])
-        h_tiles = len(self.state.map)
+        if self.state is None:
+            self.margin = (0, 0)
+            return
+        w_tiles = self.state.map_state.width
+        h_tiles = self.state.map_state.height
 
         total_map_h = h_tiles * MODULE_SIZE
         x = (screen_w - w_tiles * MODULE_SIZE) // 2
@@ -211,10 +215,10 @@ class GameScene(BaseScene):
         if not sprites:
             return
 
-        rows, cols = len(self.state.map), len(self.state.map[0])
+        rows, cols = self.state.map_state.height, self.state.map_state.width
         cache_surface = pygame.Surface((cols * MODULE_SIZE, rows * MODULE_SIZE))
 
-        for y, row in enumerate(self.state.map):
+        for y, row in enumerate(self.state.map_state.layout):
             for x, cell in enumerate(row):
                 rect = pygame.Rect(x * MODULE_SIZE, y * MODULE_SIZE, MODULE_SIZE, MODULE_SIZE)
                 sprite = sprites.get(cell)
@@ -232,7 +236,7 @@ class GameScene(BaseScene):
         if not self.state:
             return
 
-        rows, cols = len(self.state.map), len(sestate.map[0])
+        rows, cols = self.state.map_state.height, self.state.map_state.width
         grid_color = (*SLATE_GRAY[:3], 60)  # Semi-transparente
 
         # Linhas horizontais
@@ -275,7 +279,7 @@ class GameScene(BaseScene):
         if not self.state:
             return
 
-        rows, cols = len(self.state.map), len(self.state.map[0])
+        rows, cols = self.state.map_state.height, self.state.map_state.width
 
         for pstate in self.state.players.values():
             for bomb in pstate.bombs:
@@ -307,11 +311,15 @@ class GameScene(BaseScene):
                                 or ty < 0
                                 or ty >= rows
                                 or tx >= cols
-                                or self.state.map[ty][tx] == MapBlockType.UNBREAKABLE
+                                or self.state.map_state.get_block_type(tx, ty)
+                                == MapBlockType.UNBREAKABLE
                             ):
                                 break
                             tiles_by_dir[i].append((tx, ty))
-                            if self.state.map[ty][tx] == MapBlockType.BREAKABLE:
+                            if (
+                                self.state.map_state.get_block_type(tx, ty)
+                                == MapBlockType.BREAKABLE
+                            ):
                                 break
 
                     for dir_idx, tiles in tiles_by_dir.items():
@@ -347,8 +355,24 @@ class GameScene(BaseScene):
         """Renderiza power-ups no mapa."""
         if not self.state:
             return
+        power_ups = self.state.map_state.objects
 
         floating_var = sin(pygame.time.get_ticks() * 0.005) * 5
+
+        for pu in power_ups:
+            pu_type = pu.type
+            pu_x, pu_y = pu.position
+            if (
+                pu_type in PowerUpType
+                and self.state.map_state.layout[pu_y][pu_x] == MapBlockType.EMPTY
+            ):
+                # Posição base do power-up
+                pu_screen_x = self.margin[0] + pu_x * MODULE_SIZE
+                pu_screen_y = self.margin[1] + pu_y * MODULE_SIZE + floating_var
+
+                # Desenha o power-up por cima da sombra
+                sprite = POWER_UPS[pu_type]
+                screen.blit(sprite, (pu_screen_x, pu_screen_y))
 
     def _render_fps(self, screen: pygame.Surface) -> None:
         """Contador de FPS avançado com métricas detalhadas."""
@@ -490,7 +514,7 @@ class GameScene(BaseScene):
         # 3. Hash do estado do mapa para detecção de mudanças finas
         import hashlib
 
-        map_str = str(self.state.map)
+        map_str = str(self.state.map_state.layout)
         current_hash = hashlib.md5(map_str.encode()).hexdigest()
         if current_hash != self._last_state_hash:
             self._need_map_refresh = True
