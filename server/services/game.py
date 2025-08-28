@@ -38,7 +38,7 @@ class GameService:
             await User.prisma().find_unique(where={"id": pid}) for pid in player_ids
         ]  # type: ignore [fé que o ID existe.]
 
-        game = GameState(game_id=game_id)
+        game = GameState(game_id=game_id, time_start=timeout)
         positions = [(1, 1), (len(game.map[0]) - 2, len(game.map) - 2)]
         ic(positions)
 
@@ -85,6 +85,7 @@ class GameService:
     async def _finalize_match(self, game_id: str, winner_id: str | None = None) -> None:
         ic(game_id, winner_id)
         data: MatchUpdateInput = {"endedAt": datetime.now()}
+
         if winner_id:
             data["winnerUserId"] = winner_id
         try:
