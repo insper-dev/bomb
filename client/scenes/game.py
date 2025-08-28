@@ -1,3 +1,5 @@
+from math import sin
+
 import pygame
 
 from client.game.bomb import Bomb
@@ -88,21 +90,33 @@ class GameScene(BaseScene):
         self._dirty_rects = []
         self._last_rendered_positions = {}
 
+        # instancia temporizador
+        self._init_timer()
+
     @property
     def state(self) -> GameState | None:
         return self.service.state
+
+    def _init_timer(self) -> None:
+        """Inicializa o temporizador do jogo."""
+        self.start_time = pygame.time.get_ticks()
+        if self.state is not None:
+            self.limited_time = self.state.time_start
+
+    @property
+    def elapsed_time(self) -> int:
+        return pygame.time.get_ticks() - self.start_time
 
     def _on_game_end(self, status: GameStatus, winner: str | None) -> None:
         """Callback chamado quando o jogo termina."""
         print(f"[INFO] Jogo terminou - Status: {status}, Winner: {winner}")
         self.service.stop()
-        pygame.mixer.music.stop()
         self.app.current_scene = Scenes.GAME_OVER
 
     def _calc_margin(self, state: GameState) -> None:
         screen_w, screen_h = self.app.screen.get_size()
-        w_tiles = len(state.map[0])
-        h_tiles = len(state.map)
+        w_tiles = len(self.state.map[0])
+        h_tiles = len(self.state.map)
 
         total_map_h = h_tiles * MODULE_SIZE
         x = (screen_w - w_tiles * MODULE_SIZE) // 2
@@ -153,13 +167,16 @@ class GameScene(BaseScene):
             player.update()
             player.render()
 
-        # 4) Bombas com efeitos melhorados
+        # 4 Renderiza power-ups
+        self._render_power_ups(screen)
+
+        # 5) Bombas com efeitos melhorados
         self._render_bombs_enhanced(screen)
 
-        # 5) Explosões com partículas melhoradas
+        # 6) Explosões com partículas melhoradas
         self._render_explosions_enhanced(screen)
 
-        # 6) FPS counter (debug)
+        # 7) FPS counter (debug)
         if self.show_fps:
             self._render_fps(screen)
 
@@ -215,7 +232,7 @@ class GameScene(BaseScene):
         if not self.state:
             return
 
-        rows, cols = len(self.state.map), len(self.state.map[0])
+        rows, cols = len(self.state.map), len(sestate.map[0])
         grid_color = (*SLATE_GRAY[:3], 60)  # Semi-transparente
 
         # Linhas horizontais
@@ -326,15 +343,22 @@ class GameScene(BaseScene):
                             sprite = EXPLOSION_PARTICLES[part][fixed_dir_idx]
                             screen.blit(sprite, (px, py))
 
+    def _render_power_ups(self, screen: pygame.Surface) -> None:
+        """Renderiza power-ups no mapa."""
+        if not self.state:
+            return
+
+        floating_var = sin(pygame.time.get_ticks() * 0.005) * 5
+
     def _render_fps(self, screen: pygame.Surface) -> None:
         """Contador de FPS avançado com métricas detalhadas."""
         fps = int(self.app.clock.get_fps())
         fps_color = ACCENT_GREEN if fps >= 50 else ACCENT_YELLOW if fps >= 30 else ACCENT_RED
         fps_text = self.fps_font.render(f"FPS: {fps}", True, fps_color)
-        screen.blit(fps_text, (10, 10))
+        screen.blit(fps_text, (10, 10 + self.margin[1] - 20))
 
         # Indicador de latência
-        latency = self.service.latency
+        latency = self.service._ping_stats["current_ping"] * 1000  # Convert to ms
         quality = self.service.connection_quality
 
         # Cor baseada na qualidade
@@ -350,7 +374,7 @@ class GameScene(BaseScene):
         latency_text = self.fps_font.render(
             f"Ping: {latency:.0f}ms ({quality})", True, latency_color
         )
-        screen.blit(latency_text, (10, 30))
+        screen.blit(latency_text, (10, 30 + self.margin[1] - 20))
 
     def _draw_modern_hud(self, screen: pygame.Surface, screen_w: int) -> None:
         """HUD moderno e elegante."""
@@ -385,18 +409,18 @@ class GameScene(BaseScene):
         # Player A (esquerda)
         self._draw_player_info(screen, a, 20, font_title, font_info, True)
 
-        # VS central com estilo
-        vs_text = font_title.render("VS", True, ACCENT_BLUE)
-        vs_x = (screen_w - vs_text.get_width()) // 2
-        vs_y = (self.HUD_HEIGHT - vs_text.get_height()) // 2
+        # Timer central com estilo
+        timer_text = self._get_timer_text(font_title)
+        timer_x = (screen_w - timer_text.get_width()) // 2
+        timer_y = (self.HUD_HEIGHT - timer_text.get_height()) // 2
 
-        # Glow para o VS
+        # Glow para o timer
         glow_surface = pygame.Surface(
-            (vs_text.get_width() + 20, vs_text.get_height() + 10), pygame.SRCALPHA
+            (timer_text.get_width() + 20, timer_text.get_height() + 10), pygame.SRCALPHA
         )
         pygame.draw.ellipse(glow_surface, (*ACCENT_BLUE[:3], 30), glow_surface.get_rect())
-        screen.blit(glow_surface, (vs_x - 10, vs_y - 5))
-        screen.blit(vs_text, (vs_x, vs_y))
+        screen.blit(glow_surface, (timer_x - 10, timer_y - 5))
+        screen.blit(timer_text, (timer_x, timer_y))
 
         # Player B (direita)
         self._draw_player_info(screen, b, screen_w - 150, font_title, font_info, False)
@@ -497,3 +521,31 @@ class GameScene(BaseScene):
     def _draw_hud(self, screen: pygame.Surface, screen_w: int) -> None:
         """Método legado - agora chama o moderno."""
         self._draw_modern_hud(screen, screen_w)
+
+    def _get_timer_text(self, font: pygame.font.Font) -> pygame.Surface:
+        """Get formatted timer text with color coding based on remaining time."""
+
+        if not self.limited_time:
+            # Fallback timer - 3 minutes default
+            timer_text = font.render("3:00", True, ACCENT_BLUE)
+            self._init_timer()
+            return timer_text
+
+        # Game duration in seconds
+        game_duration = self.limited_time
+        remaining = max(0, game_duration - self.elapsed_time / 1000)
+
+        # Format time as MM:SS
+        minutes = int(remaining // 60)
+        seconds = int(remaining % 60)
+        time_str = f"{minutes}:{seconds:02d}"
+
+        # Color based on remaining time
+        if remaining > (self.limited_time * 0.5):  # More than 50% time left
+            color = ACCENT_GREEN
+        elif remaining > (self.limited_time * 0.25):  # More than 25% time left
+            color = ACCENT_YELLOW
+        else:  # Less than 25% time left
+            color = ACCENT_RED
+
+        return font.render(time_str, True, color)

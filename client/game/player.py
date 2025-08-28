@@ -145,6 +145,20 @@ class Player:
         new_x = ps.x + dx
         new_y = ps.y + dy
 
+        # Obtem a posição de todos os jogadores para evitar colisões
+        state = self.game_service.state
+        if state:
+            for other_id, other_ps in state.players.items():
+                if other_id != self.player_id and other_ps.x == new_x and other_ps.y == new_y:
+                    return False
+
+        # Obtem a posição de todas as bombas para evitar colisões
+        if state:
+            for player in state.players.values():
+                for bomb in player.bombs:
+                    if bomb.x == new_x and bomb.y == new_y:
+                        return False
+
         # Obtem o mapa atual do estado do jogo (se existir)
         map = self.game_service.state.map if self.game_service.state else None
         if map:
