@@ -9,6 +9,7 @@ from prisma.models import Match, User
 from prisma.partials import Opponent
 
 from core.models.ws import (
+    CollectPowerUpEvent,
     GameEvent,
     GameEventType,
     MatchMakingEvent,
@@ -167,6 +168,10 @@ async def _process_single_event(game_id: str, user_id: str, ev: GameEventType) -
         elif isinstance(ev, PlaceBombEvent):
             # Place bomb at x, y (server assigns timing)
             await game_service.place_bomb(game_id, user_id, ev.x, ev.y)
+
+        elif isinstance(ev, CollectPowerUpEvent):
+            # Collect power-up at x, y
+            game.collect_powerup(user_id, ev.x, ev.y)
 
         else:
             logger.warning(f"Unknown event type: {type(ev).__name__}")
