@@ -343,10 +343,10 @@ class GameScene(BaseScene):
         fps = int(self.app.clock.get_fps())
         fps_color = ACCENT_GREEN if fps >= 50 else ACCENT_YELLOW if fps >= 30 else ACCENT_RED
         fps_text = self.fps_font.render(f"FPS: {fps}", True, fps_color)
-        screen.blit(fps_text, (10, 10))
+        screen.blit(fps_text, (10, 10 + self.margin[1] - 20))
 
         # Indicador de latência
-        latency = self.service.latency
+        latency = self.service._ping_stats["current_ping"] * 1000  # Convert to ms
         quality = self.service.connection_quality
 
         # Cor baseada na qualidade
@@ -362,7 +362,7 @@ class GameScene(BaseScene):
         latency_text = self.fps_font.render(
             f"Ping: {latency:.0f}ms ({quality})", True, latency_color
         )
-        screen.blit(latency_text, (10, 30))
+        screen.blit(latency_text, (10, 30 + self.margin[1] - 20))
 
     def _draw_modern_hud(self, screen: pygame.Surface, screen_w: int) -> None:
         """HUD moderno e elegante."""

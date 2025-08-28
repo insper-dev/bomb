@@ -38,6 +38,13 @@ class GameService(ServiceBase):
 
         # Métricas de latência
         self._ping_start = 0
+        self._ping_stats = {
+            "count": 0,
+            "current_ping": 0.0,
+            "average_ping": 0.0,
+            "history": [],  # Last 10 pings
+            "quality": "good",  # good/fair/poor
+        }
         self._latency = 0
         self._packet_loss = 0
 
@@ -244,7 +251,7 @@ class GameService(ServiceBase):
             async with connect(
                 uri,
                 ssl=ssl_context,
-                ping_interval=20,
+                ping_interval=None,  # Disable automatic ping
                 ping_timeout=10,
                 max_size=2**20,
                 max_queue=32,
@@ -334,16 +341,48 @@ class GameService(ServiceBase):
         while self.running and self.websocket:
             try:
                 self._ping_start = time.time()
-                await self.websocket.ping()
-                await asyncio.sleep(5)  # Ping a cada 5 segundos
-            except Exception:
+                pong_waiter = await self.websocket.ping()
+                await pong_waiter  # Wait for pong response
+
+                # Calculate latency when pong is received
+                if self._ping_start > 0:
+                    self._latency = time.time() - self._ping_start
+                    self._update_ping_stats()
+                    self._ping_start = 0
+
+                await asyncio.sleep(2)  # Ping a cada 2 segundos
+            except Exception as e:
+                print(f"[DEBUG] Ping failed: {e}")
                 break
 
+    def _update_ping_stats(self) -> None:
+        """Update ping statistics after receiving pong."""
+        # Update ping statistics
+        self._ping_stats["count"] += 1
+        self._ping_stats["current_ping"] = self._latency
+        self._ping_stats["history"].append(self._latency)
+
+        # Keep only last 10 pings
+        if len(self._ping_stats["history"]) > 10:
+            self._ping_stats["history"] = self._ping_stats["history"][-10:]
+
+        # Calculate average
+        history = self._ping_stats["history"]
+        self._ping_stats["average_ping"] = sum(history) / len(history)
+
+        # Update quality
+        if self._latency < 0.05:
+            self._ping_stats["quality"] = "excellent"
+        elif self._latency < 0.1:
+            self._ping_stats["quality"] = "good"
+        elif self._latency < 0.2:
+            self._ping_stats["quality"] = "fair"
+        else:
+            self._ping_stats["quality"] = "poor"
+
     def _on_pong(self, _data) -> None:
-        """Callback de pong para calcular latência."""
-        if self._ping_start > 0:
-            self._latency = time.time() - self._ping_start
-            self._ping_start = 0
+        """Callback de pong para calcular latência - não usado mais."""
+        pass
 
     def _reconcile_server_state(self, server_state: GameState) -> GameState:
         """
