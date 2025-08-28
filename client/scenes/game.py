@@ -98,6 +98,7 @@ class GameScene(BaseScene):
         """Callback chamado quando o jogo termina."""
         print(f"[INFO] Jogo terminou - Status: {status}, Winner: {winner}")
         self.service.stop()
+        pygame.mixer.music.stop()
         self.app.current_scene = Scenes.GAME_OVER
 
     def _calc_margin(self, state: GameState) -> None:
