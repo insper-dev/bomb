@@ -1,7 +1,9 @@
+from math import sin
+
 import pygame
 
 from client.services.game import GameService
-from core.constants import MODULE_SIZE, PLAYERS_MAP, MapBlockType
+from core.constants import EFFECTS, MODULE_SIZE, PLAYERS_MAP, MapBlockType
 from core.models.game import PlayerState
 from core.types import PlayerDirectionState
 
@@ -160,18 +162,18 @@ class Player:
                         return False
 
         # Obtem o mapa atual do estado do jogo (se existir)
-        map = self.game_service.state.map if self.game_service.state else None
-        if map:
+        map_state = self.game_service.state.map_state if self.game_service.state else None
+        if map_state:
             # Verifica limites do mapa
-            lim_x = len(map[0])
-            lim_y = len(map)
+            lim_x = map_state.width
+            lim_y = map_state.height
 
             # Verifica se a nova posição é válida dentro do mapa
             if new_x < 0 or new_x >= lim_x or new_y < 0 or new_y >= lim_y:
                 return False
 
             # Verifica se o espaço é vazio ou não):
-            space = map[new_y][new_x]
+            space = map_state.get_block_type(new_x, new_y)
             if not (space == MapBlockType.EMPTY or space is None):
                 return False
         else:
@@ -304,8 +306,8 @@ class Player:
         is_local = current and current.id == self.player_id
 
         # Renderização com efeitos -- desativado por enquanto
-        # if is_local:
-        #     self._render_local_player_effects(x_px, y_px)
+
+        self._render_local_player_effects(x_px, y_px)
 
         # Sprite principal
         self.app.screen.blit(sprite, (x_px, y_px))
@@ -321,19 +323,18 @@ class Player:
 
     def _render_local_player_effects(self, x_px: float, y_px: float) -> None:
         """Renderiza efeitos para o jogador local."""
-        # Sombra suave
-        shadow_size = MODULE_SIZE + 6
-        shadow_surface = pygame.Surface((shadow_size, shadow_size), pygame.SRCALPHA)
 
-        # Gradient shadow
-        for i in range(3):
-            alpha = 60 - i * 15
-            radius = (shadow_size // 2) - i
-            pygame.draw.circle(
-                shadow_surface, (0, 0, 0, alpha), (shadow_size // 2, shadow_size // 2), radius
+        # Efeito de Escudo
+        if self.player_state and any(pu for pu in self.player_state.power_ups if pu == "shield"):
+            shield_surface = EFFECTS["shield"]
+            fact = abs(sin(pygame.time.get_ticks() / 200) * 0.05)
+            mod = int(MODULE_SIZE * (fact + 1))
+            shield_surface = pygame.transform.scale(
+                shield_surface,
+                (mod, mod),
             )
-
-        self.app.screen.blit(shadow_surface, (x_px - 3, y_px + 1))
+            loss = MODULE_SIZE - mod
+            self.app.screen.blit(shield_surface, (x_px + loss // 2, y_px + loss))
 
     def __get_outline_color(self, cor, sprite) -> pygame.Surface:
         mask = pygame.mask.from_surface(sprite)

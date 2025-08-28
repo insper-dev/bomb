@@ -8,7 +8,7 @@ from websockets import ClientConnection, ConnectionClosed, connect
 
 from client.services.base import ServiceBase
 from core.models.game import BombState, GameState, GameStatus
-from core.models.ws import MovimentEvent, PlaceBombEvent
+from core.models.ws import CollectPowerUpEvent, MovimentEvent, PlaceBombEvent
 from core.serialization import unpack_game_state
 from core.ssl_config import get_websocket_ssl_context
 from core.types import PlayerDirectionState
@@ -147,11 +147,15 @@ class GameService(ServiceBase):
         for cb in self._moviment_callbacks:
             cb(new_position)
 
-        # Envia para servidor com sequence ID
-        ev = MovimentEvent(direction=direction)
         # Seria ideal adicionar sequence_id ao MovimentEvent, mas por agora mantemos simples
-        self._queue_message(ev.model_dump_json())
+        ev1 = MovimentEvent(direction=direction)
+        self._queue_message(ev1.model_dump_json())
         self._last_send_time = current_time
+
+        # Envia para servidor com sequence ID
+        if any(pu for pu in self.state.map_state.objects if pu.position == new_position):
+            ev2 = CollectPowerUpEvent(x=new_position[0], y=new_position[1])
+            self._queue_message(ev2.model_dump_json(), high_priority=True)
 
     def send_bomb(self) -> None:
         """

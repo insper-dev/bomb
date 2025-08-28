@@ -39,7 +39,16 @@ class PlaceBombEvent(BaseModel):
     y: int
 
 
-GameEventType = Annotated[MovimentEvent | PlaceBombEvent, Field(discriminator="event")]
+class CollectPowerUpEvent(BaseModel):
+    event: Literal["collect_powerup"] = "collect_powerup"
+    x: int
+    y: int
+
+
+GameEventType = Annotated[
+    MovimentEvent | PlaceBombEvent | CollectPowerUpEvent,
+    Field(discriminator="event"),
+]
 GameEvent: TypeAdapter[GameEventType] = TypeAdapter(GameEventType)
 
 

@@ -260,6 +260,14 @@ POWER_UPS: dict[PowerUpType, pygame.Surface] = {
     ),
 }
 
+EFFECTS_PATH = IMAGES_PATH / "particles"
+EFFECTS = {
+    "shield": pygame.transform.scale(
+        pygame.image.load(EFFECTS_PATH / "shield.png"),
+        (MODULE_SIZE, MODULE_SIZE),
+    ),
+}
+
 # Songs
 SONGS_PATH = ASSETS_PATH / "songs"
 SONGS: dict[GameTheme, Path] = {
