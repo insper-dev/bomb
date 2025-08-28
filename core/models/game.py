@@ -165,6 +165,7 @@ class GameState(BaseModel):
     map: list[list[MapBlockType]] = Field(default_factory=generate_map)
     status: GameStatus = GameStatus.PLAYING
     winner_id: str | None = None
+    time_start: int
 
     def move_player(
         self, player_id: str, dx: int, dy: int, direction: PlayerDirectionState
