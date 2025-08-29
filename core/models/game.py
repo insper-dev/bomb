@@ -79,6 +79,9 @@ class MapState(BaseModel):
         else:
             ic(f"set_block: Out of bounds ({x}, {y})")
 
+    def remove_object(self, x: int, y: int) -> None:
+        self.objects = [obj for obj in self.objects if obj.position != (x, y)]
+
     def add_object(self, x: int, y: int, obj_type: PowerUpType) -> None:
         if 0 <= y < self.height and 0 <= x < self.width:
             self.objects.append(MapObject(type=obj_type, position=(x, y)))
