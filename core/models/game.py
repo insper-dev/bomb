@@ -138,7 +138,7 @@ def get_theme() -> GameTheme:
 
 def generate_map() -> MapState:
     maps_root = "client/assets/maps/"
-    mpas_paths = ["standard.json", "ort.json"]
+    mpas_paths = ["standard.json", "ort.json", "squares.json"]
     maps_path = maps_root + random.choice(mpas_paths)
 
     # Load base map
