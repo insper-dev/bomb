@@ -166,16 +166,16 @@ class GameScene(BaseScene):
         # 2) Grade sutil --removed
         # self._render_subtle_grid(screen)
 
-        # 3 Renderiza power-ups
-        self._render_power_ups(screen)
-
-        # 4) Bombas com efeitos melhorados
-        self._render_bombs_enhanced(screen)
-
-        # 5) Jogadores com interpolação
+        # 3) Jogadores com interpolação
         for player in self.players.values():
             player.update()
             player.render()
+
+        # 4 Renderiza power-ups
+        self._render_power_ups(screen)
+
+        # 5) Bombas com efeitos melhorados
+        self._render_bombs_enhanced(screen)
 
         # 6) Explosões com partículas melhoradas
         self._render_explosions_enhanced(screen)
@@ -216,14 +216,13 @@ class GameScene(BaseScene):
             return
 
         rows, cols = self.state.map_state.height, self.state.map_state.width
-        # Cria uma superfície invísivel para o cache
-        cache_surface = pygame.Surface((cols * MODULE_SIZE, rows * MODULE_SIZE), pygame.SRCALPHA)
+        cache_surface = pygame.Surface((cols * MODULE_SIZE, rows * MODULE_SIZE))
 
         for y, row in enumerate(self.state.map_state.layout):
             for x, cell in enumerate(row):
                 rect = pygame.Rect(x * MODULE_SIZE, y * MODULE_SIZE, MODULE_SIZE, MODULE_SIZE)
                 sprite = sprites.get(cell)
-                if sprite and sprite != MapBlockType.EMPTY:
+                if sprite:
                     if isinstance(sprite, pygame.Surface):
                         cache_surface.blit(sprite, rect)
                     else:

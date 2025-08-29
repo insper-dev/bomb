@@ -25,6 +25,8 @@ class GameService:
         # Network optimization tracking
         self.last_state_hashes: dict[str, str] = {}
         self.packet_counters: dict[str, int] = {}
+        # Background tasks tracking for proper cleanup
+        self.background_tasks: set[asyncio.Task] = set()
 
     async def create_game(self, player_ids: list[str], timeout: int = 60) -> str:
         ic(player_ids, timeout)
@@ -39,8 +41,7 @@ class GameService:
         ]  # type: ignore [fé que o ID existe.]
 
         game = GameState(game_id=game_id, time_start=timeout)
-        positions = [(1, 1), (game.map_state.width - 2, game.map_state.height - 2)]
-        ic(positions)
+        positions = game.map_state.start_positions
 
         for i, player in enumerate(players):
             x, y = positions[i] if i < len(positions) else (0, 0)
@@ -114,6 +115,12 @@ class GameService:
             conns.remove(ws)
             ic(game_id, len(conns))
             logger.debug(f"Removed connection from game {game_id}: {len(conns)} remaining")
+
+            # Properly close the WebSocket connection
+            if not ws.client_state.closed:
+                close_task = asyncio.create_task(ws.close())
+                self.background_tasks.add(close_task)
+                close_task.add_done_callback(self.background_tasks.discard)
 
     async def broadcast_state(self, game_id: str) -> None:
         game = self.games.get(game_id)
@@ -237,44 +244,81 @@ class GameService:
             await self.broadcast_state(game_id)
 
             # 4. Aguarda tempo para a animação rodar
+            # 6. Verifica hits antes da remoção da bomba
+            hits = [pid for pid, p in game.players.items() if (p.x, p.y) in affected_tiles]
+            for ple in hits:
+                player = game.players.get(ple)
+                if player and "shield" in player.power_ups:
+                    game.remove_powerup(ple, PowerUpType.SHIELD)
+                    hits.remove(ple)
+                    ic(f"Player {ple} blocked explosion with SHIELD")
+            ic("Players hit:", hits)
             animation_delay = 0.8  # segundos
             await asyncio.sleep(animation_delay)
 
-            # 5. Remove a bomba e atualiza estado final
-            if game := self.games.get(game_id):  # Re-fetch game to ensure it still exists
-                game.explode_bomb(owner_id, bomb_id, remove_bomb=True)
+            # Finaliza imediatamente caso o acertado
+            if hits:
+                # vencedor é quem NÃO foi atingido (assumindo 2 jogadores)
+                survivors = [pid for pid in game.players if pid not in hits]
+                winner = survivors[0] if survivors else None
+                ic("Players hit:", hits, "Survivors:", survivors, "Winner:", winner)
+                game.end_game(winner)
+
+                # atualiza banco e notifica
+                if winner:  # Only declare a winner if one exists
+                    ic(f"Declaring winner: {winner}")
+                    task = asyncio.create_task(self._declare_winner(game_id, winner))
+                    self.winner_tasks.add(task)
+                    task.add_done_callback(self.winner_tasks.discard)
+                else:
+                    # If there are hits but no winner, it's a draw
+                    ic("Hits but no winner - finalizing as draw")
+                    task = asyncio.create_task(self._finalize_match(game_id))
+                    self.winner_tasks.add(task)
+                    task.add_done_callback(self.winner_tasks.discard)
                 await self.broadcast_state(game_id)
+                return
 
-                # 6. Verifica hits e processa fim de jogo se necessário
-                hits = [pid for pid, p in game.players.items() if (p.x, p.y) in affected_tiles]
-                for ple in hits:
-                    player = game.players.get(ple)
-                    if player and "shield" in player.power_ups:
-                        game.remove_powerup(ple, PowerUpType.SHIELD)
-                        hits.remove(ple)
-                        ic(f"Player {ple} blocked explosion with SHIELD")
-                ic("Players hit:", hits)
+            # 5. Remove a bomba e atualiza estado final
+            game = self.games.get(game_id)  # Re-fetch game to ensure it still exists
+            if game is None:
+                return
 
-                # Só encerra o jogo se alguém foi atingido
-                if hits:
-                    # vencedor é quem NÃO foi atingido (assumindo 2 jogadores)
-                    survivors = [pid for pid in game.players if pid not in hits]
-                    winner = survivors[0] if survivors else None
-                    ic("Players hit:", hits, "Survivors:", survivors, "Winner:", winner)
-                    game.end_game(winner)
+            game.explode_bomb(owner_id, bomb_id, remove_bomb=True)
+            await self.broadcast_state(game_id)
 
-                    # atualiza banco e notifica
-                    if winner:  # Only declare a winner if one exists
-                        ic(f"Declaring winner: {winner}")
-                        task = asyncio.create_task(self._declare_winner(game_id, winner))
-                        self.winner_tasks.add(task)
-                        task.add_done_callback(self.winner_tasks.discard)
-                    else:
-                        # If there are hits but no winner, it's a draw
-                        ic("Hits but no winner - finalizing as draw")
-                        task = asyncio.create_task(self._finalize_match(game_id))
-                        self.winner_tasks.add(task)
-                        task.add_done_callback(self.winner_tasks.discard)
+            # 6. Verifica hits depois da remoção da bomba
+            hits = [pid for pid, p in game.players.items() if (p.x, p.y) in affected_tiles]
+            for ple in hits:
+                player = game.players.get(ple)
+                if player and "shield" in player.power_ups:
+                    game.remove_powerup(ple, PowerUpType.SHIELD)
+                    hits.remove(ple)
+                    ic(f"Player {ple} blocked explosion with SHIELD")
+            ic("Players hit:", hits)
+
+            ic("Total players hit:", hits)
+
+            # Só encerra o jogo se alguém foi atingido
+            if hits:
+                # vencedor é quem NÃO foi atingido (assumindo 2 jogadores)
+                survivors = [pid for pid in game.players if pid not in hits]
+                winner = survivors[0] if survivors else None
+                ic("Players hit:", hits, "Survivors:", survivors, "Winner:", winner)
+                game.end_game(winner)
+
+                # atualiza banco e notifica
+                if winner:  # Only declare a winner if one exists
+                    ic(f"Declaring winner: {winner}")
+                    task = asyncio.create_task(self._declare_winner(game_id, winner))
+                    self.winner_tasks.add(task)
+                    task.add_done_callback(self.winner_tasks.discard)
+                else:
+                    # If there are hits but no winner, it's a draw
+                    ic("Hits but no winner - finalizing as draw")
+                    task = asyncio.create_task(self._finalize_match(game_id))
+                    self.winner_tasks.add(task)
+                    task.add_done_callback(self.winner_tasks.discard)
 
             # Always broadcast state updates, but only continue game if no hits
             await self.broadcast_state(game_id)
@@ -311,6 +355,22 @@ class GameService:
             if task := self.bomb_timers.pop(key, None):
                 task.cancel()
                 ic(f"Bomb timer cancelled for {key[1]}")
+
+    async def cleanup(self) -> None:
+        """Cleanup all background tasks and resources."""
+        logger.info("Starting game service cleanup...")
+
+        # Cancel all background tasks
+        tasks_to_cancel = list(self.background_tasks)
+        for task in tasks_to_cancel:
+            task.cancel()
+
+        # Wait for all tasks to complete cancellation
+        if tasks_to_cancel:
+            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
+
+        self.background_tasks.clear()
+        logger.info(f"Cleaned up {len(tasks_to_cancel)} background tasks")
 
 
 game_service = GameService()

@@ -148,8 +148,10 @@ async def _process_event_queues(
 
     except asyncio.CancelledError:
         logger.debug(f"Event processing cancelled for user {user_id} in game {game_id}")
+        raise  # Re-raise to ensure proper cancellation
     except Exception as e:
         logger.error(f"Error in event processing for user {user_id}: {e}")
+        raise
 
 
 async def _process_single_event(game_id: str, user_id: str, ev: GameEventType) -> None:
@@ -217,6 +219,14 @@ async def game_ws(websocket: WebSocket, game_id: str) -> None:
         _process_event_queues(game_id, user.id, high_priority_queue, normal_queue)
     )
 
+    # Add task to game service tracking (assuming this gets added to the server service)
+    try:
+        game_service.background_tasks.add(processing_task)
+        processing_task.add_done_callback(game_service.background_tasks.discard)
+    except AttributeError:
+        # Fallback if background_tasks not available
+        pass
+
     try:
         while True:
             raw = await websocket.receive_json()
@@ -237,11 +247,19 @@ async def game_ws(websocket: WebSocket, game_id: str) -> None:
     except WebSocketDisconnect:
         game_service.remove_connection(game_id, websocket)
         processing_task.cancel()
+        try:
+            await processing_task
+        except asyncio.CancelledError:
+            pass  # Expected when cancelling
     except Exception as e:
         logger.error(f"WebSocket error for user {user.id} in game {game_id}: {e}")
         await websocket.close(code=WebSocketCloseCode.ERROR)
         game_service.remove_connection(game_id, websocket)
         processing_task.cancel()
+        try:
+            await processing_task
+        except asyncio.CancelledError:
+            pass  # Expected when cancelling
 
 
 @router.websocket("/leaderboard")

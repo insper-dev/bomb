@@ -107,6 +107,10 @@ class Player:
             pygame.K_DOWN: "down",
             pygame.K_LEFT: "left",
             pygame.K_RIGHT: "right",
+            pygame.K_w: "up",
+            pygame.K_s: "down",
+            pygame.K_a: "left",
+            pygame.K_d: "right",
         }
 
         if event.key in key_map:
@@ -174,7 +178,7 @@ class Player:
 
             # Verifica se o espaço é vazio ou não):
             space = map_state.get_block_type(new_x, new_y)
-            if not (space == MapBlockType.EMPTY or space is None):
+            if not (space == MapBlockType.FLOOR or space is None):
                 return False
         else:
             # Se não houver mapa, assume que o movimento é válido com limites básicos
@@ -339,10 +343,16 @@ class Player:
     def __get_outline_color(self, cor, sprite) -> pygame.Surface:
         mask = pygame.mask.from_surface(sprite)
         surface = pygame.Surface((mask.get_size()), pygame.SRCALPHA)
-        surface.fill((0, 0, 0, 0))  # Cor dour
-        outline = mask.outline()
-        for point in outline:
-            surface.set_at(point, cor)
+        surface.fill((0, 0, 0, 0))  # Transparent background
+        try:
+            outline = mask.outline()
+            for point in outline:
+                surface.set_at(point, cor)
+        except Exception as e:
+            # Handle mask outline errors gracefully
+            print(f"[DEBUG] Mask outline error: {e}")
+            # Return empty surface if outline fails
+            pass
         return surface
 
     def _render_local_player_outline(

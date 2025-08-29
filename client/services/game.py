@@ -57,6 +57,9 @@ class GameService(ServiceBase):
         self._server_position = None
         self._prediction_enabled = True
 
+        # Background tasks tracking
+        self._background_tasks = set()
+
     def register_game_ended_callback(
         self, callback: Callable[[GameStatus, str | None], None]
     ) -> None:
@@ -86,10 +89,33 @@ class GameService(ServiceBase):
             return
         self.running = False
         if self.websocket and self._loop:
-            asyncio.run_coroutine_threadsafe(self.websocket.close(), self._loop)
-            self._loop.call_soon_threadsafe(self._loop.stop)
+            try:
+                # Schedule background task cleanup and websocket close
+                cleanup_future = asyncio.run_coroutine_threadsafe(self._cleanup_tasks(), self._loop)
+                cleanup_future.result(timeout=2.0)  # Wait for cleanup to complete
+            except Exception as e:
+                print(f"[DEBUG] Cleanup error: {e}")
+            finally:
+                self._loop.call_soon_threadsafe(self._loop.stop)
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=1)
+            self._thread.join(timeout=2)
+
+    async def _cleanup_tasks(self) -> None:
+        """Cleanup background tasks and close websocket."""
+        # Cancel all background tasks
+        tasks_to_cancel = list(self._background_tasks)
+        for task in tasks_to_cancel:
+            task.cancel()
+
+        # Wait for tasks to complete cancellation
+        if tasks_to_cancel:
+            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
+
+        self._background_tasks.clear()
+
+        # Close websocket
+        if self.websocket and not self.websocket.closed:
+            await self.websocket.close()
 
     def clear_game_state(self) -> None:
         """Clear game state and match_id for new matchmaking."""
@@ -265,6 +291,8 @@ class GameService(ServiceBase):
 
                 # Task para processar ping/pong
                 ping_task = asyncio.create_task(self._ping_loop())
+                self._background_tasks.add(ping_task)
+                ping_task.add_done_callback(self._background_tasks.discard)
 
                 try:
                     while self.running:
@@ -317,13 +345,27 @@ class GameService(ServiceBase):
 
                 finally:
                     ping_task.cancel()
+                    try:
+                        await ping_task
+                    except asyncio.CancelledError:
+                        pass  # Expected when cancelling
 
         except Exception as e:
             print(f"[ERROR] Erro de conexão GameService: {e}")
         finally:
             self.running = False
-            self.websocket = None
-            if self._loop:
+            if self.websocket:
+                try:
+                    # Ensure websocket is properly closed
+                    if not self.websocket.closed:
+                        close_task = asyncio.create_task(self.websocket.close())
+                        self._background_tasks.add(close_task)
+                        close_task.add_done_callback(self._background_tasks.discard)
+                except Exception as e:
+                    print(f"[DEBUG] Error closing websocket: {e}")
+                finally:
+                    self.websocket = None
+            if self._loop and not self._loop.is_closed():
                 self._loop.stop()
 
     def _parse_state_optimized(self, raw_data: str) -> GameState | None:
@@ -342,22 +384,28 @@ class GameService(ServiceBase):
 
     async def _ping_loop(self) -> None:
         """Loop de ping para medir latência."""
-        while self.running and self.websocket:
-            try:
-                self._ping_start = time.time()
-                pong_waiter = await self.websocket.ping()
-                await pong_waiter  # Wait for pong response
+        try:
+            while self.running and self.websocket:
+                try:
+                    self._ping_start = time.time()
+                    pong_waiter = await self.websocket.ping()
+                    await pong_waiter  # Wait for pong response
 
-                # Calculate latency when pong is received
-                if self._ping_start > 0:
-                    self._latency = time.time() - self._ping_start
-                    self._update_ping_stats()
-                    self._ping_start = 0
+                    # Calculate latency when pong is received
+                    if self._ping_start > 0:
+                        self._latency = time.time() - self._ping_start
+                        self._update_ping_stats()
+                        self._ping_start = 0
 
-                await asyncio.sleep(2)  # Ping a cada 2 segundos
-            except Exception as e:
-                print(f"[DEBUG] Ping failed: {e}")
-                break
+                    await asyncio.sleep(2)  # Ping a cada 2 segundos
+                except asyncio.CancelledError:
+                    raise  # Re-raise to allow proper cancellation
+                except Exception as e:
+                    print(f"[DEBUG] Ping failed: {e}")
+                    break
+        except asyncio.CancelledError:
+            print("[DEBUG] Ping loop cancelled")
+            raise
 
     def _update_ping_stats(self) -> None:
         """Update ping statistics after receiving pong."""

@@ -220,7 +220,7 @@ FLOORS_COLORS: dict[str, pygame.Color] = {
 
 FLOORS: dict[GameTheme, list[pygame.Color]] = {
     GameTheme.DESERT: [FLOORS_COLORS["desert-light"], FLOORS_COLORS["desert-dark"]],
-    GameTheme.SHED: [FLOORS_COLORS["shed-light"], FLOORS_COLORS["shed-dark"]],
+    GameTheme.SHED: [FLOORS_COLORS["shed-light"], FLOORS_COLORS["shed-light"]],
 }
 
 BLOCKS: dict[GameTheme, dict[MapBlockType, pygame.Surface | pygame.Color]] = {
@@ -231,7 +231,7 @@ BLOCKS: dict[GameTheme, dict[MapBlockType, pygame.Surface | pygame.Color]] = {
         MapBlockType.UNBREAKABLE: pygame.transform.scale(
             pygame.image.load(BLOCKS_PATH / "Diamante.png"), (MODULE_SIZE, MODULE_SIZE)
         ),
-        MapBlockType.EMPTY: FLOORS[GameTheme.DESERT][1],
+        MapBlockType.FLOOR: FLOORS[GameTheme.DESERT][1],
     },
     GameTheme.SHED: {
         MapBlockType.BREAKABLE: pygame.transform.scale(
@@ -240,7 +240,7 @@ BLOCKS: dict[GameTheme, dict[MapBlockType, pygame.Surface | pygame.Color]] = {
         MapBlockType.UNBREAKABLE: pygame.transform.scale(
             pygame.image.load(BLOCKS_PATH / "Metal.png"), (MODULE_SIZE, MODULE_SIZE)
         ),
-        MapBlockType.EMPTY: FLOORS[GameTheme.SHED][0],
+        MapBlockType.FLOOR: FLOORS[GameTheme.SHED][0],
     },
 }
 
@@ -274,6 +274,7 @@ SONGS: dict[GameTheme, Path] = {
     GameTheme.DESERT: SONGS_PATH / "desert_theme.mpeg",
     GameTheme.SHED: SONGS_PATH / "shed_theme.mpeg",
 }
+
 
 # Bomb
 BOMB_PATH = IMAGES_PATH / "bomb"

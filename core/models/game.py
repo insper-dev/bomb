@@ -37,6 +37,7 @@ class MapBlockType(str, Enum):
     """
 
     EMPTY = "empty"
+    FLOOR = "floor"
     BREAKABLE = "breakable"
     UNBREAKABLE = "unbreakable"
     POWER_UP = "power_up"
@@ -66,6 +67,7 @@ class MapState(BaseModel):
     height: int
     layout: list[list[MapBlockType]]
     objects: list[MapObject] = Field(default_factory=list)
+    start_positions: list[tuple[int, int]] = Field(default_factory=list)
 
     def get_block_type(self, x: int, y: int) -> MapBlockType:
         if 0 <= y < self.height and 0 <= x < self.width:
@@ -135,15 +137,15 @@ def get_theme() -> GameTheme:
 
 
 def generate_map() -> MapState:
-    maps_path = "core/maps"
-    maps_path += "/map1.json"  # Default map
+    maps_root = "client/assets/maps/"
+    mpas_paths = ["standard.json", "ort.json", "squares.json"]
+    maps_path = maps_root + random.choice(mpas_paths)
 
     # Load base map
     with open(maps_path) as f:
-        base_map_data = json.load(f)
+        map = json.load(f)
 
     # Map structure
-    map = base_map_data["map"]
     # columns, rows, layout
     # layout is a 2D array of characters representing block types
     # D = destructible, U = undestructible, E = empty, R = random (D or E)
@@ -156,8 +158,9 @@ def generate_map() -> MapState:
     # Start with an empty grid
     map_grid = [[MapBlockType.EMPTY for _ in range(width)] for _ in range(height)]
 
-    # Place indestructible blocks in layout patern
+    positions = []
 
+    # Place indestructible blocks in layout patern
     # Count indestructible and destructible blocks
     indestructible_count = 0
     destructible_count = 0
@@ -168,20 +171,27 @@ def generate_map() -> MapState:
             block_type = map["layout"][y][x]  # get the block type from the layout
             print(f"Processing block at ({x}, {y}): {block_type}")
             if block_type == "R":
-                block_type = random.choice(
-                    ["D", "E"]
-                )  # Randomly choose between destructible or empty
+                if random.random() < 0.7:
+                    block_type = "D"
+                else:
+                    block_type = "F"
+
+            if block_type == "P":
+                positions.append((x, y))
+                block_type = "F"
             if block_type == "D":
                 block = MapBlockType.BREAKABLE
                 destructible_count += 1
             elif block_type == "U":
                 indestructible_count += 1
                 block = MapBlockType.UNBREAKABLE
+            elif block_type == "F":
+                block = MapBlockType.FLOOR
             else:
                 block = MapBlockType.EMPTY
             map_grid[y][x] = block
 
-    map_state = MapState(width=width, height=height, layout=map_grid)
+    map_state = MapState(width=width, height=height, layout=map_grid, start_positions=positions)
 
     ic(f"Placed {indestructible_count} indestructible blocks")
 
@@ -191,7 +201,7 @@ def generate_map() -> MapState:
     power_up_count = 0
     for y in range(height):
         for x in range(width):
-            if map_grid[y][x] == MapBlockType.BREAKABLE and random.random() < 0.1:
+            if map_grid[y][x] == MapBlockType.BREAKABLE and random.random() < 0.2:
                 power_up_type = random.choice(list(PowerUpType))
                 map_state.add_object(x, y, power_up_type)
                 power_up_count += 1
@@ -314,7 +324,7 @@ class GameState(BaseModel):
 
         # Check for walls
         target_block = self.map_state.layout[new_y][new_x]
-        if target_block not in {MapBlockType.EMPTY, MapBlockType.POWER_UP}:
+        if target_block not in {MapBlockType.FLOOR, MapBlockType.POWER_UP}:
             ic(f"Move rejected: destination has {target_block}")
             return
 
@@ -419,7 +429,7 @@ class GameState(BaseModel):
                 # se for quebrável, remove e para nesta direção
                 if cell == MapBlockType.BREAKABLE:
                     old_cell = self.map_state.layout[ny][nx]
-                    self.map_state.layout[ny][nx] = MapBlockType.EMPTY
+                    self.map_state.layout[ny][nx] = MapBlockType.FLOOR
                     destroyed_blocks.append((nx, ny, old_cell))
                     ic(f"{direction_name}: Destroyed {old_cell} at ({nx}, {ny})")
                     break
