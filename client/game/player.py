@@ -174,7 +174,7 @@ class Player:
 
             # Verifica se o espaço é vazio ou não):
             space = map_state.get_block_type(new_x, new_y)
-            if not (space == MapBlockType.EMPTY or space is None):
+            if not (space == MapBlockType.FLOOR or space is None):
                 return False
         else:
             # Se não houver mapa, assume que o movimento é válido com limites básicos

@@ -39,8 +39,7 @@ class GameService:
         ]  # type: ignore [fé que o ID existe.]
 
         game = GameState(game_id=game_id, time_start=timeout)
-        positions = [(1, 1), (game.map_state.width - 2, game.map_state.height - 2)]
-        ic(positions)
+        positions = game.map_state.start_positions
 
         for i, player in enumerate(players):
             x, y = positions[i] if i < len(positions) else (0, 0)
