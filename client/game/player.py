@@ -107,6 +107,10 @@ class Player:
             pygame.K_DOWN: "down",
             pygame.K_LEFT: "left",
             pygame.K_RIGHT: "right",
+            pygame.K_w: "up",
+            pygame.K_s: "down",
+            pygame.K_a: "left",
+            pygame.K_d: "right",
         }
 
         if event.key in key_map:
