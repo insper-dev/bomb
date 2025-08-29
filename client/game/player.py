@@ -339,10 +339,16 @@ class Player:
     def __get_outline_color(self, cor, sprite) -> pygame.Surface:
         mask = pygame.mask.from_surface(sprite)
         surface = pygame.Surface((mask.get_size()), pygame.SRCALPHA)
-        surface.fill((0, 0, 0, 0))  # Cor dour
-        outline = mask.outline()
-        for point in outline:
-            surface.set_at(point, cor)
+        surface.fill((0, 0, 0, 0))  # Transparent background
+        try:
+            outline = mask.outline()
+            for point in outline:
+                surface.set_at(point, cor)
+        except Exception as e:
+            # Handle mask outline errors gracefully
+            print(f"[DEBUG] Mask outline error: {e}")
+            # Return empty surface if outline fails
+            pass
         return surface
 
     def _render_local_player_outline(

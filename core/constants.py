@@ -220,7 +220,7 @@ FLOORS_COLORS: dict[str, pygame.Color] = {
 
 FLOORS: dict[GameTheme, list[pygame.Color]] = {
     GameTheme.DESERT: [FLOORS_COLORS["desert-light"], FLOORS_COLORS["desert-dark"]],
-    GameTheme.SHED: [FLOORS_COLORS["shed-light"], FLOORS_COLORS["shed-dark"]],
+    GameTheme.SHED: [FLOORS_COLORS["shed-light"], FLOORS_COLORS["shed-light"]],
 }
 
 BLOCKS: dict[GameTheme, dict[MapBlockType, pygame.Surface | pygame.Color]] = {
