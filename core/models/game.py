@@ -125,7 +125,7 @@ class PlayerState(BaseModel):
     x: int = 0
     y: int = 0
     power_ups: list[str] = Field(default_factory=list)
-    skin: PlayerType = Field(default_factory=lambda: random.choice(["carlitos", "rogerio"]))
+    skin: PlayerType
     bombs: list[BombState] = Field(default_factory=list)
     alive: bool = True
     kills: int = 0
