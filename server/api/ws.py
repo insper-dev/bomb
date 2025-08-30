@@ -28,9 +28,24 @@ async def matchmaking_loop() -> None:
     """Agrupa dois jogadores por vez e notifica ambos."""
     get_match = False
     count = 0
+    last_player_count = 0
     while True:
         try:
             waiting_player_ids = list(waiting_players)
+            current_player_count = len(waiting_players)
+
+            # Send player count updates to all waiting players
+            if current_player_count != last_player_count:
+                last_player_count = current_player_count
+                player_count_event = MatchMakingEvent(
+                    event="player_count", player_count=current_player_count
+                )
+                for ws in waiting_players.values():
+                    try:
+                        await ws.send_json(player_count_event.model_dump())
+                    except Exception as e:
+                        logger.error(f"Error sending player count update: {e}")
+
             if len(waiting_players) >= 2:
                 get_match = True
                 while count < 5:
@@ -38,6 +53,17 @@ async def matchmaking_loop() -> None:
                         count = 5  # skip wait if we have 4 players
                     count += 1
                     print(count)
+
+                    # Send countdown to all waiting players
+                    countdown_event = MatchMakingEvent(
+                        event="countdown", countdown=6 - count, player_count=len(waiting_players)
+                    )
+                    for ws in waiting_players.values():
+                        try:
+                            await ws.send_json(countdown_event.model_dump())
+                        except Exception as e:
+                            logger.error(f"Error sending countdown: {e}")
+
                     await asyncio.sleep(1)
                     waiting_player_ids = list(waiting_players)
             if get_match:

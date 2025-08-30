@@ -58,6 +58,8 @@ GameEvent: TypeAdapter[GameEventType] = TypeAdapter(GameEventType)
 
 
 class MatchMakingEvent(BaseModel):
-    event: Literal["match_found", "error"] = "match_found"
+    event: Literal["match_found", "error", "player_count", "countdown"] = "match_found"
     match_id: str | None = None
     opponent: Opponent | None = None
+    player_count: int | None = None
+    countdown: int | None = None

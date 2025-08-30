@@ -24,6 +24,8 @@ class MatchmakingService(ServiceBase):
         self.running: bool = False
         self.match_id: str | None = None
         self.opponent: Opponent | None = None
+        self.player_count: int = 0
+        self.countdown: int | None = None
 
     def start(self) -> None:
         """Begin matchmaking: opens a WebSocket, blocks until match found."""
@@ -35,6 +37,8 @@ class MatchmakingService(ServiceBase):
 
         self.match_id = None
         self.opponent = None
+        self.player_count = 0
+        self.countdown = None
 
         self.running = True
         self._loop = asyncio.new_event_loop()
@@ -97,11 +101,16 @@ class MatchmakingService(ServiceBase):
                 ssl_context = get_websocket_ssl_context() if protocol == "wss" else None
                 async with connect(uri, ssl=ssl_context) as ws:
                     self.websocket = ws
-                    # aguarda evento match_found
                     while self.running:
                         msg = await ws.recv()
                         data = MatchMakingEvent.model_validate_json(msg)
-                        if data.event == "match_found":
+
+                        if data.event == "player_count":
+                            self.player_count = data.player_count or 0
+                        elif data.event == "countdown":
+                            self.countdown = data.countdown
+                            self.player_count = data.player_count or 0
+                        elif data.event == "match_found":
                             self.opponent = data.opponent
                             self.match_id = data.match_id
                             self.running = False
