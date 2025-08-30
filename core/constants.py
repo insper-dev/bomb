@@ -275,6 +275,11 @@ SONGS: dict[GameTheme, Path] = {
     GameTheme.SHED: SONGS_PATH / "shed_theme.mpeg",
 }
 
+# Sounds
+SONDS_PATH = ASSETS_PATH / "sounds"
+SOUNDS: dict[str, Path] = {
+    "bomb_explosion": SONDS_PATH / "bomb_explosion.mpeg",
+}
 
 # Bomb
 BOMB_PATH = IMAGES_PATH / "bomb"

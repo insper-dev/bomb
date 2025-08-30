@@ -25,32 +25,57 @@ waiting_players: dict[str, WebSocket] = {}
 
 async def matchmaking_loop() -> None:
     """Agrupa dois jogadores por vez e notifica ambos."""
+    get_match = False
+    count = 0
     while True:
         try:
             waiting_player_ids = list(waiting_players)
             if len(waiting_players) >= 2:
+                get_match = True
+                while count < 5:
+                    if len(waiting_players) >= 4:
+                        count = 5  # skip wait if we have 4 players
+                    count += 1
+                    print(count)
+                    await asyncio.sleep(1)
+                    waiting_player_ids = list(waiting_players)
+            if get_match:
+                get_match = False
+                count = 0
                 player_id1 = waiting_player_ids[0]
                 player_id2 = waiting_player_ids[1]
+                player_id3 = waiting_player_ids[2] if len(waiting_player_ids) > 2 else None
+                player_id4 = waiting_player_ids[3] if len(waiting_player_ids) > 3 else None
 
-                match_id = await game_service.create_game([player_id1, player_id2])
+                players = [
+                    p for p in [player_id1, player_id2, player_id3, player_id4] if p is not None
+                ]
 
-                ws1 = waiting_players[player_id1]
-                ws2 = waiting_players[player_id2]
-                opponent1 = await Opponent.prisma().find_unique(where={"id": player_id1})
-                opponent2 = await Opponent.prisma().find_unique(where={"id": player_id2})
+                match_id = await game_service.create_game(players)
 
+                wss = [waiting_players[pid] for pid in players if pid is not None]
+
+                opponents = []
+                for ws in wss:
+                    pid = next(k for k, v in waiting_players.items() if v == ws and k in players)
+                    opponent = await Opponent.prisma().find_unique(where={"id": pid})
+                    opponents.append(opponent)
                 try:
-                    await ws1.send_json(
-                        MatchMakingEvent(match_id=match_id, opponent=opponent2).model_dump()
-                    )
-                    await ws2.send_json(
-                        MatchMakingEvent(match_id=match_id, opponent=opponent1).model_dump()
-                    )
+                    for opponent_ws, opponent in zip(wss, opponents, strict=False):
+                        await opponent_ws.send_json(
+                            MatchMakingEvent(match_id=match_id, opponent=opponent).model_dump()
+                        )
 
-                    del waiting_players[player_id1]
-                    del waiting_players[player_id2]
+                    for player_id in players:
+                        if player_id and player_id in waiting_players:
+                            del waiting_players[player_id]
 
-                    logger.info(f"Match created: {match_id} between {player_id1} and {player_id2}")
+                    if len(players) > 2:
+                        logging.info(f"Match created: {match_id} between {players}")
+                    else:
+                        logger.info(
+                            f"Match created: {match_id} between {player_id1} and {player_id2}"
+                        )
                 except Exception as e:
                     logger.error(f"Error sending match notification: {e!s}")
                     continue

@@ -150,6 +150,9 @@ class GameService(ServiceBase):
         if not current_player:
             return
 
+        if current_player.alive is False:
+            return  # Jogador morto não pode se mover
+
         # Tenta mover localmente para validar
         new_position = self.state.move_player(user.id, dx, dy, direction)
         if new_position is None:
@@ -193,8 +196,8 @@ class GameService(ServiceBase):
         if not user:
             return
         pstate = self.state.players.get(user.id)
-        if not pstate:
-            return
+        if not pstate or pstate.alive is False:
+            return  # Jogador morto não pode colocar bomba
 
         if pstate.bombs and len(pstate.bombs) >= pstate.max_bombs:
             return  # Limite de bombas atingido

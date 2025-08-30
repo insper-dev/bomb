@@ -22,6 +22,7 @@ from core.constants import (
     POWER_UPS,
     SLATE_GRAY,
     SONGS,
+    SOUNDS,
     WHITE,
 )
 from core.models.game import GameState, GameStatus, MapBlockType, PowerUpType
@@ -290,6 +291,11 @@ class GameScene(BaseScene):
 
                     self.bombs = [b for b in self.bombs if b.id != bomb.id]
 
+                    # Toca som de explosão
+                    explosion_sound = pygame.mixer.Sound(SOUNDS["bomb_explosion"])
+                    explosion_sound.set_volume(0.1)
+                    explosion_sound.play()
+
                     # Centro da explosão com glow
                     glow_size = MODULE_SIZE + 20
                     glow_surface = pygame.Surface((glow_size, glow_size), pygame.SRCALPHA)
@@ -422,17 +428,21 @@ class GameScene(BaseScene):
 
         # Informações dos jogadores
         pids = list(self.state.players.keys())
-        if len(pids) >= 2:
-            a, b = self.state.players[pids[0]], self.state.players[pids[1]]
-        else:
+        if not len(pids) >= 2:
             return
 
         # Fontes modernas
         font_title = pygame.font.SysFont("Arial", 20, bold=True)
         font_info = pygame.font.SysFont("Arial", 14)
 
-        # Player A (esquerda)
-        self._draw_player_info(screen, a, 20, font_title, font_info, True)
+        # Player 1 (esquerda)
+        positions = [20, screen_w - 210, 250, screen_w - 450]
+        for idx, pid in enumerate(pids):
+            if idx >= 4:
+                break
+            self._draw_player_info(
+                screen, self.state.players[pid], positions[idx], font_title, font_info, True
+            )
 
         # Timer central com estilo
         timer_text = self._get_timer_text(font_title)
@@ -446,9 +456,6 @@ class GameScene(BaseScene):
         pygame.draw.ellipse(glow_surface, (*ACCENT_BLUE[:3], 30), glow_surface.get_rect())
         screen.blit(glow_surface, (timer_x - 10, timer_y - 5))
         screen.blit(timer_text, (timer_x, timer_y))
-
-        # Player B (direita)
-        self._draw_player_info(screen, b, screen_w - 150, font_title, font_info, False)
 
     def _draw_player_info(
         self,
@@ -506,6 +513,10 @@ class GameScene(BaseScene):
             for bomb in player.bombs:
                 if bomb.exploded_at is not None:
                     explosion_count += 1
+
+        for pid, p in self.state.players.items():
+            if p.alive is False and pid in self.players:
+                del self.players[pid]
 
         if explosion_count != self._last_explosion_count:
             # CRÍTICO: Explosões sempre invalidam o cache do mapa
