@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import random
 from datetime import datetime
+from xmlrpc.client import Boolean
 
 from fastapi import WebSocket
 from icecream import ic
@@ -42,14 +44,17 @@ class GameService:
 
         game = GameState(game_id=game_id, time_start=timeout)
         positions = game.map_state.start_positions
+        if len(players) < 3:
+            positions = [max(positions), min(positions)]
+
+        skins = ["carlitos", "rogerio", "claudio", "daniel"]
 
         for i, player in enumerate(players):
+            skin = random.choice(skins)
+            skins.remove(skin)
             x, y = positions[i] if i < len(positions) else (0, 0)
             game.players[player.id] = PlayerState(
-                username=player.username,
-                direction_state="stand_by",
-                x=x,
-                y=y,
+                username=player.username, direction_state="down", x=x, y=y, skin=skin
             )
             ic(player, x, y)
 
@@ -92,10 +97,22 @@ class GameService:
         try:
             ic(data)
             await Match.prisma().update(where={"id": game_id}, data=data)
+            pids = self.games[game_id].players.keys()
+            for pid in pids:
+                await MatchPlayer.prisma().update(
+                    where={"matchId_userId": {"matchId": game_id, "userId": pid}},
+                    data={
+                        "isWinner": False,
+                        "playersKilled": self.games[game_id].players[pid].kills,
+                    },
+                )
+
             if winner_id:
                 await MatchPlayer.prisma().update_many(
                     where={"matchId": game_id, "userId": winner_id},
-                    data={"isWinner": True},
+                    data={
+                        "isWinner": True,
+                    },
                 )
                 ic(f"Updated winner status for {winner_id}")
             logger.info(f"Finalized match {game_id}; winner: {winner_id or 'draw'}")
@@ -187,6 +204,10 @@ class GameService:
             ic(f"Player {owner_id} not found in game {game_id}")
             return
 
+        if player.alive is False:
+            ic(f"Player {owner_id} is not alive in game {game_id}, cannot place bomb")
+            return
+
         # TODO: criar bomba com powerups (só aumento de raio)
         bomb = BombState(x=x, y=y, radius=player.bomb_radius)
         ic(bomb)
@@ -214,6 +235,55 @@ class GameService:
         except Exception as e:
             ic(f"Error incrementing bombs: {type(e).__name__}", str(e))
             logger.error(f"Error updating bombsPlaced for {game_id}, user {owner_id}: {e}")
+
+    async def _check_if_hitted(self, game_id: str, hits: list[str], owner_id: str) -> Boolean:
+        try:
+            ic("Players hit:", hits)
+            if not hits:
+                return False
+            owner = self.games[game_id].players[owner_id]
+
+            hitteds = [
+                pid for pid, p in self.games[game_id].players.items() if pid in hits and p.alive
+            ]
+            for player in hitteds:
+                self.games[game_id].players[player].alive = False
+                if player != owner_id:
+                    owner.kills += 1
+
+            await asyncio.sleep(
+                0.1
+            )  # Pequena pausa para garantir atualização antes de verificar vencedores
+            survivors = [pid for pid, p in self.games[game_id].players.items() if p.alive]
+            if not survivors:
+                result = "draw"
+            elif len(survivors) == 1:
+                result = survivors[0]
+            else:
+                result = None
+
+            # atualiza banco e notificaic(f"Declaring winner: {winner}")
+
+            if result and result == "draw":  # Only declare a winner if one exists
+                # If there are hits but no winner, it's a draw
+                self.games[game_id].end_game()
+                ic("Hits but no winner - finalizing as draw")
+                task = asyncio.create_task(self._finalize_match(game_id))
+                self.winner_tasks.add(task)
+                task.add_done_callback(self.winner_tasks.discard)
+                ic("Players hit:", hits, "Survivors:", survivors, "Result:", result)
+            elif result:
+                self.games[game_id].end_game(result)
+                task = asyncio.create_task(self._declare_winner(game_id, result))
+                self.winner_tasks.add(task)
+                task.add_done_callback(self.winner_tasks.discard)
+                ic("Players hit:", hits, "Survivors:", survivors, "Winner:", result)
+            await self.broadcast_state(game_id)
+            return True if result else False
+        except Exception as e:
+            ic(f"Error checking hits: {type(e).__name__}", str(e))
+            logger.error(f"Error checking hits in game {game_id}: {e}")
+            return False
 
     # Removido o parâmetro radius, já que agora é uma propriedade da bomba
     async def _handle_explosion(
@@ -245,7 +315,9 @@ class GameService:
 
             # 4. Aguarda tempo para a animação rodar
             # 6. Verifica hits antes da remoção da bomba
-            hits = [pid for pid, p in game.players.items() if (p.x, p.y) in affected_tiles]
+            hits = [
+                pid for pid, p in game.players.items() if (p.x, p.y) in affected_tiles and p.alive
+            ]
             for ple in hits:
                 player = game.players.get(ple)
                 if player and "shield" in player.power_ups:
@@ -257,26 +329,7 @@ class GameService:
             await asyncio.sleep(animation_delay)
 
             # Finaliza imediatamente caso o acertado
-            if hits:
-                # vencedor é quem NÃO foi atingido (assumindo 2 jogadores)
-                survivors = [pid for pid in game.players if pid not in hits]
-                winner = survivors[0] if survivors else None
-                ic("Players hit:", hits, "Survivors:", survivors, "Winner:", winner)
-                game.end_game(winner)
-
-                # atualiza banco e notifica
-                if winner:  # Only declare a winner if one exists
-                    ic(f"Declaring winner: {winner}")
-                    task = asyncio.create_task(self._declare_winner(game_id, winner))
-                    self.winner_tasks.add(task)
-                    task.add_done_callback(self.winner_tasks.discard)
-                else:
-                    # If there are hits but no winner, it's a draw
-                    ic("Hits but no winner - finalizing as draw")
-                    task = asyncio.create_task(self._finalize_match(game_id))
-                    self.winner_tasks.add(task)
-                    task.add_done_callback(self.winner_tasks.discard)
-                await self.broadcast_state(game_id)
+            if await self._check_if_hitted(game_id, hits, owner_id):
                 return
 
             # 5. Remove a bomba e atualiza estado final
@@ -300,25 +353,8 @@ class GameService:
             ic("Total players hit:", hits)
 
             # Só encerra o jogo se alguém foi atingido
-            if hits:
-                # vencedor é quem NÃO foi atingido (assumindo 2 jogadores)
-                survivors = [pid for pid in game.players if pid not in hits]
-                winner = survivors[0] if survivors else None
-                ic("Players hit:", hits, "Survivors:", survivors, "Winner:", winner)
-                game.end_game(winner)
-
-                # atualiza banco e notifica
-                if winner:  # Only declare a winner if one exists
-                    ic(f"Declaring winner: {winner}")
-                    task = asyncio.create_task(self._declare_winner(game_id, winner))
-                    self.winner_tasks.add(task)
-                    task.add_done_callback(self.winner_tasks.discard)
-                else:
-                    # If there are hits but no winner, it's a draw
-                    ic("Hits but no winner - finalizing as draw")
-                    task = asyncio.create_task(self._finalize_match(game_id))
-                    self.winner_tasks.add(task)
-                    task.add_done_callback(self.winner_tasks.discard)
+            if await self._check_if_hitted(game_id, hits, owner_id):
+                return
 
             # Always broadcast state updates, but only continue game if no hits
             await self.broadcast_state(game_id)
@@ -371,6 +407,46 @@ class GameService:
 
         self.background_tasks.clear()
         logger.info(f"Cleaned up {len(tasks_to_cancel)} background tasks")
+
+    async def remove_player(self, game_id: str, player_id: str) -> None:
+        """Remove a player from the game and handle game state accordingly."""
+        ic(game_id, player_id)
+        game = self.games.get(game_id)
+        if not game:
+            ic(f"Game {game_id} not found for player removal")
+            return
+
+        player = game.players.get(player_id)
+        if not player:
+            ic(f"Player {player_id} not found in game {game_id}")
+            return
+
+        # Mark player as not alive
+        player.alive = False
+        logger.info(f"Player {player_id} removed from game {game_id}")
+
+        # Check if this removal ends the game
+        survivors = [pid for pid, p in game.players.items() if p.alive]
+        if not survivors:
+            result = "draw"
+        elif len(survivors) == 1:
+            result = survivors[0]
+        else:
+            result = None
+
+        if result and result == "draw":
+            game.end_game()
+            ic("Player removal led to draw - finalizing match")
+            task = asyncio.create_task(self._finalize_match(game_id))
+            self.winner_tasks.add(task)
+            task.add_done_callback(self.winner_tasks.discard)
+        elif result:
+            game.end_game(result)
+            task = asyncio.create_task(self._declare_winner(game_id, result))
+            self.winner_tasks.add(task)
+            task.add_done_callback(self.winner_tasks.discard)
+
+        await self.broadcast_state(game_id)
 
 
 game_service = GameService()

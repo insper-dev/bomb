@@ -2,10 +2,18 @@ from math import sin
 
 import pygame
 
+from client.config_manager import config_manager
 from client.game.bomb import Bomb
 from client.game.player import Player
 from client.scenes.base import BaseScene, Scenes
 from client.services.game import GameService
+from client.subscenes import (
+    ConfigSubScene,
+    InventorySubScene,
+    PauseSubScene,
+    SubSceneManager,
+    SubSceneType,
+)
 from core.constants import (
     ACCENT_BLUE,
     ACCENT_GREEN,
@@ -22,6 +30,7 @@ from core.constants import (
     POWER_UPS,
     SLATE_GRAY,
     SONGS,
+    SOUNDS,
     WHITE,
 )
 from core.models.game import GameState, GameStatus, MapBlockType, PowerUpType
@@ -31,6 +40,7 @@ class GameScene(BaseScene):
     """
     Cena principal: mapa + jogadores + bombas + explosões,
     com HUD no topo mostrando quem está contra quem.
+    Agora com sistema de subscenas para UI overlay.
     """
 
     HUD_HEIGHT = 50
@@ -94,6 +104,16 @@ class GameScene(BaseScene):
         # instancia temporizador
         self._init_timer()
 
+        # Initialize subscene system
+        self.subscene_manager = SubSceneManager(self)
+
+        # Register subscenes
+        self.subscene_manager.register_subscene(SubSceneType.PAUSE, PauseSubScene(self.app, self))
+        self.subscene_manager.register_subscene(SubSceneType.CONFIG, ConfigSubScene(self.app, self))
+        self.subscene_manager.register_subscene(
+            SubSceneType.INVENTORY, InventorySubScene(self.app, self)
+        )
+
     @property
     def state(self) -> GameState | None:
         return self.service.state
@@ -130,13 +150,26 @@ class GameScene(BaseScene):
         self.margin = (x, y)
 
     def handle_event(self, event) -> None:
+        # Let subscenes handle events first
+        if self.subscene_manager.handle_event(event):
+            return  # Event was consumed by a subscene
+
+        # Only handle game events if no modal subscene is active
+        if self.subscene_manager.has_modal_subscene:
+            return
+
         if event.type == pygame.KEYDOWN:
             user = self.app.auth_service.current_user
             if user and user.id in self.players:
                 self.players[user.id].handle_event(event)
-            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
-                self.service.stop()
-                self.app.current_scene = Scenes.START
+
+            # Check for subscene hotkeys
+            if config_manager.is_key_for_action(event.key, "pause"):
+                self.subscene_manager.toggle_subscene(SubSceneType.PAUSE)
+            elif event.key == pygame.K_i:  # Inventory hotkey
+                self.subscene_manager.toggle_subscene(SubSceneType.INVENTORY)
+            elif event.key == pygame.K_F1:  # Config hotkey
+                self.subscene_manager.show_subscene(SubSceneType.CONFIG)
 
     def render(self) -> None:
         screen = self.app.screen
@@ -163,26 +196,26 @@ class GameScene(BaseScene):
         # 1) Mapa com cache otimizado
         self._render_map_optimized(screen)
 
-        # 2) Grade sutil --removed
-        # self._render_subtle_grid(screen)
-
-        # 3 Renderiza power-ups
+        # 2) Renderiza power-ups
         self._render_power_ups(screen)
 
-        # 4) Bombas com efeitos melhorados
+        # 3) Bombas com efeitos melhorados
         self._render_bombs_enhanced(screen)
 
-        # 5) Jogadores com interpolação
+        # 4) Jogadores com interpolação
         for player in self.players.values():
             player.update()
             player.render()
 
-        # 6) Explosões com partículas melhoradas
+        # 5) Explosões com partículas melhoradas
         self._render_explosions_enhanced(screen)
 
-        # 7) FPS counter (debug)
+        # 6) FPS counter (debug)
         if self.show_fps:
             self._render_fps(screen)
+
+        # 7) Render active subscenes
+        self.subscene_manager.render(screen)
 
     def _render_gradient_background(self, screen: pygame.Surface, w: int, h: int) -> None:
         """Renderiza background com gradiente moderno."""
@@ -232,31 +265,10 @@ class GameScene(BaseScene):
 
         self._map_cache = cache_surface
 
-    def _render_subtle_grid(self, screen: pygame.Surface) -> None:
-        """Grade sutil e moderna."""
-        if not self.state:
-            return
-
-        rows, cols = self.state.map_state.height, self.state.map_state.width
-        grid_color = (*SLATE_GRAY[:3], 60)  # Semi-transparente
-
-        # Linhas horizontais
-        for i in range(rows + 1):
-            y = self.margin[1] + i * MODULE_SIZE
-            pygame.draw.line(
-                screen, grid_color, (self.margin[0], y), (self.margin[0] + cols * MODULE_SIZE, y), 1
-            )
-
-        # Linhas verticais
-        for j in range(cols + 1):
-            x = self.margin[0] + j * MODULE_SIZE
-            pygame.draw.line(
-                screen, grid_color, (x, self.margin[1]), (x, self.margin[1] + rows * MODULE_SIZE), 1
-            )
-
     def _render_bombs_enhanced(self, screen: pygame.Surface) -> None:
         """Bombas com efeitos visuais melhorados."""
-        # current_time = pygame.time.get_ticks()
+        if not self.state:
+            return
 
         for pstate in self.state.players.values():
             for bomb in pstate.bombs:
@@ -289,6 +301,11 @@ class GameScene(BaseScene):
                     cy = self.margin[1] + bomb.y * MODULE_SIZE
 
                     self.bombs = [b for b in self.bombs if b.id != bomb.id]
+
+                    # Toca som de explosão
+                    explosion_sound = pygame.mixer.Sound(SOUNDS["bomb_explosion"])
+                    explosion_sound.set_volume(0.1)
+                    explosion_sound.play()
 
                     # Centro da explosão com glow
                     glow_size = MODULE_SIZE + 20
@@ -422,17 +439,21 @@ class GameScene(BaseScene):
 
         # Informações dos jogadores
         pids = list(self.state.players.keys())
-        if len(pids) >= 2:
-            a, b = self.state.players[pids[0]], self.state.players[pids[1]]
-        else:
+        if not len(pids) >= 2:
             return
 
         # Fontes modernas
         font_title = pygame.font.SysFont("Arial", 20, bold=True)
         font_info = pygame.font.SysFont("Arial", 14)
 
-        # Player A (esquerda)
-        self._draw_player_info(screen, a, 20, font_title, font_info, True)
+        # Player 1 (esquerda)
+        positions = [20, screen_w - 210, 250, screen_w - 450]
+        for idx, pid in enumerate(pids):
+            if idx >= 4:
+                break
+            self._draw_player_info(
+                screen, self.state.players[pid], positions[idx], font_title, font_info, True
+            )
 
         # Timer central com estilo
         timer_text = self._get_timer_text(font_title)
@@ -446,9 +467,6 @@ class GameScene(BaseScene):
         pygame.draw.ellipse(glow_surface, (*ACCENT_BLUE[:3], 30), glow_surface.get_rect())
         screen.blit(glow_surface, (timer_x - 10, timer_y - 5))
         screen.blit(timer_text, (timer_x, timer_y))
-
-        # Player B (direita)
-        self._draw_player_info(screen, b, screen_w - 150, font_title, font_info, False)
 
     def _draw_player_info(
         self,
@@ -507,6 +525,10 @@ class GameScene(BaseScene):
                 if bomb.exploded_at is not None:
                     explosion_count += 1
 
+        for pid, p in self.state.players.items():
+            if p.alive is False and pid in self.players:
+                del self.players[pid]
+
         if explosion_count != self._last_explosion_count:
             # CRÍTICO: Explosões sempre invalidam o cache do mapa
             self._need_map_refresh = True
@@ -541,11 +563,6 @@ class GameScene(BaseScene):
                 radius,
             )
             self._assets_cache[f"glow_{radius}"] = glow_surface
-
-    # Mantém método antigo para compatibilidade
-    def _draw_hud(self, screen: pygame.Surface, screen_w: int) -> None:
-        """Método legado - agora chama o moderno."""
-        self._draw_modern_hud(screen, screen_w)
 
     def _get_timer_text(self, font: pygame.font.Font) -> pygame.Surface:
         """Get formatted timer text with color coding based on remaining time."""

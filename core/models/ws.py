@@ -45,8 +45,13 @@ class CollectPowerUpEvent(BaseModel):
     y: int
 
 
+class LeaveMatchEvent(BaseModel):
+    event: Literal["leave_match"] = "leave_match"
+    player: str
+
+
 GameEventType = Annotated[
-    MovimentEvent | PlaceBombEvent | CollectPowerUpEvent,
+    MovimentEvent | PlaceBombEvent | CollectPowerUpEvent | LeaveMatchEvent,
     Field(discriminator="event"),
 ]
 GameEvent: TypeAdapter[GameEventType] = TypeAdapter(GameEventType)

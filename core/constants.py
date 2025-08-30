@@ -205,6 +205,15 @@ FONT_SIZE_MAP: dict[IsFocused, dict[FontSize, dict[ComponentSize, int]]] = {
 
 MODULE_SIZE = 64
 
+SCENES_IMAGES_PATH = IMAGES_PATH / "scenes"
+SCENES_IMAGE_MAP: dict[str, pygame.Surface] = {
+    "background": pygame.transform.scale(
+        pygame.image.load(SCENES_IMAGES_PATH / "background.png"),
+        (CLIENT_WIDTH, CLIENT_HEIGHT),
+    ),
+    "logo": pygame.transform.scale_by(pygame.image.load(SCENES_IMAGES_PATH / "logo.png"), 0.1),
+}
+
 # Blocks and Floors
 BLOCKS_PATH = IMAGES_PATH / "blocks"
 
@@ -216,7 +225,6 @@ FLOORS_COLORS: dict[str, pygame.Color] = {
     "shed-light": pygame.Color(23, 23, 23),
     "shed-dark": pygame.Color(5, 5, 5),
 }
-
 
 FLOORS: dict[GameTheme, list[pygame.Color]] = {
     GameTheme.DESERT: [FLOORS_COLORS["desert-light"], FLOORS_COLORS["desert-dark"]],
@@ -275,6 +283,11 @@ SONGS: dict[GameTheme, Path] = {
     GameTheme.SHED: SONGS_PATH / "shed_theme.mpeg",
 }
 
+# Sounds
+SONDS_PATH = ASSETS_PATH / "sounds"
+SOUNDS: dict[str, Path] = {
+    "bomb_explosion": SONDS_PATH / "bomb_explosion.mpeg",
+}
 
 # Bomb
 BOMB_PATH = IMAGES_PATH / "bomb"
@@ -518,10 +531,198 @@ ROGERIO: dict[PlayerDirectionState, list[pygame.Surface]] = {
     ],
 }
 
+CLAUDIO_PATH = IMAGES_PATH / "claudio_player"
+CLAUDIO: dict[PlayerDirectionState, list[pygame.Surface]] = {
+    "right": [
+        pygame.transform.scale(
+            pygame.image.load(CLAUDIO_PATH / "horizontal_1.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(CLAUDIO_PATH / "horizontal_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(CLAUDIO_PATH / "horizontal_3.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+    "left": [
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(CLAUDIO_PATH / "horizontal_1.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(CLAUDIO_PATH / "horizontal_2.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(CLAUDIO_PATH / "horizontal_3.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+    ],
+    "down": [
+        pygame.transform.scale(
+            pygame.image.load(CLAUDIO_PATH / "front_1.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(CLAUDIO_PATH / "front_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(CLAUDIO_PATH / "front_3.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+    "up": [
+        pygame.transform.scale(
+            pygame.image.load(CLAUDIO_PATH / "back_1.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(CLAUDIO_PATH / "back_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(CLAUDIO_PATH / "back_3.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+    "stand_by": [
+        pygame.transform.scale(
+            pygame.image.load(CLAUDIO_PATH / "horizontal_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(CLAUDIO_PATH / "horizontal_2.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+        pygame.transform.scale(
+            pygame.image.load(CLAUDIO_PATH / "front_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(CLAUDIO_PATH / "back_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+}
+DANIEL_PATH = IMAGES_PATH / "daniel_player"
+DANIEL: dict[PlayerDirectionState, list[pygame.Surface]] = {
+    "right": [
+        pygame.transform.scale(
+            pygame.image.load(DANIEL_PATH / "horizontal_1.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(DANIEL_PATH / "horizontal_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(DANIEL_PATH / "horizontal_3.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+    "left": [
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(DANIEL_PATH / "horizontal_1.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(DANIEL_PATH / "horizontal_2.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(DANIEL_PATH / "horizontal_3.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+    ],
+    "down": [
+        pygame.transform.scale(
+            pygame.image.load(DANIEL_PATH / "front_1.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(DANIEL_PATH / "front_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(DANIEL_PATH / "front_3.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+    "up": [
+        pygame.transform.scale(
+            pygame.image.load(DANIEL_PATH / "back_1.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(DANIEL_PATH / "back_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(DANIEL_PATH / "back_3.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+    "stand_by": [
+        pygame.transform.scale(
+            pygame.image.load(DANIEL_PATH / "horizontal_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.flip(
+            pygame.transform.scale(
+                pygame.image.load(DANIEL_PATH / "horizontal_2.png"),
+                (MODULE_SIZE, MODULE_SIZE),
+            ),
+            True,
+            False,
+        ),
+        pygame.transform.scale(
+            pygame.image.load(DANIEL_PATH / "front_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+        pygame.transform.scale(
+            pygame.image.load(DANIEL_PATH / "back_2.png"),
+            (MODULE_SIZE, MODULE_SIZE),
+        ),
+    ],
+}
 
 PLAYERS_MAP: dict[PlayerType, dict[PlayerDirectionState, list[pygame.Surface]]] = {
     "carlitos": CARLITOS,
     "rogerio": ROGERIO,
+    "claudio": CLAUDIO,
+    "daniel": DANIEL,
 }
 
 

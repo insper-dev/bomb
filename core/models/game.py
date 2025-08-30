@@ -121,12 +121,14 @@ class BombState(BaseModel):
 
 class PlayerState(BaseModel):
     username: str
-    direction_state: PlayerDirectionState
+    direction_state: PlayerDirectionState = "down"
     x: int = 0
     y: int = 0
     power_ups: list[str] = Field(default_factory=list)
-    skin: PlayerType = Field(default_factory=lambda: random.choice(["carlitos", "rogerio"]))
+    skin: PlayerType
     bombs: list[BombState] = Field(default_factory=list)
+    alive: bool = True
+    kills: int = 0
     max_bombs: int = 2
     bomb_delay: int = 2  # seconds
     bomb_radius: int = 2
@@ -316,6 +318,10 @@ class GameState(BaseModel):
             ic(f"Move rejected: player {player_id} not in game")
             return
 
+        if self.players[player_id].alive is False:
+            ic(f"Move rejected: player {player_id} is not alive")
+            return
+
         p = self.players[player_id]
         old_pos = (p.x, p.y)
         new_x = max(0, min(self.map_state.width - 1, p.x + dx))
@@ -348,6 +354,9 @@ class GameState(BaseModel):
         # TODO: não permitir spammar bombas, a não ser que algum powerup permita.
         ic(f"Adding bomb for player {player_id} at ({bomb.x}, {bomb.y}) with radius {bomb.radius}")
         if player_id in self.players:
+            if self.players[player_id].alive is False:
+                ic(f"Add bomb rejected: player {player_id} is not alive")
+                return
             self.players[player_id].bombs.append(bomb)
             ic(f"Player {player_id} now has {len(self.players[player_id].bombs)} active bombs")
         else:
