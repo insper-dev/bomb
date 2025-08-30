@@ -154,7 +154,13 @@ class Player:
         state = self.game_service.state
         if state:
             for other_id, other_ps in state.players.items():
-                if other_id != self.player_id and other_ps.x == new_x and other_ps.y == new_y:
+                if (
+                    other_id != self.player_id
+                    and other_ps.x == new_x
+                    and other_ps.y == new_y
+                    and self.game_service.state
+                    and self.game_service.state.players[other_id].alive
+                ):
                     return False
 
         # Obtem a posição de todas as bombas para evitar colisões
