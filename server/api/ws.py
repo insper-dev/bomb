@@ -12,6 +12,7 @@ from core.models.ws import (
     CollectPowerUpEvent,
     GameEvent,
     GameEventType,
+    LeaveMatchEvent,
     MatchMakingEvent,
     MovimentEvent,
     PlaceBombEvent,
@@ -199,6 +200,9 @@ async def _process_single_event(game_id: str, user_id: str, ev: GameEventType) -
         elif isinstance(ev, CollectPowerUpEvent):
             # Collect power-up at x, y
             game.collect_powerup(user_id, ev.x, ev.y)
+
+        elif isinstance(ev, LeaveMatchEvent):
+            await game_service.remove_player(game_id, user_id)
 
         else:
             logger.warning(f"Unknown event type: {type(ev).__name__}")

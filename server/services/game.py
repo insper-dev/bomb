@@ -410,5 +410,45 @@ class GameService:
         self.background_tasks.clear()
         logger.info(f"Cleaned up {len(tasks_to_cancel)} background tasks")
 
+    async def remove_player(self, game_id: str, player_id: str) -> None:
+        """Remove a player from the game and handle game state accordingly."""
+        ic(game_id, player_id)
+        game = self.games.get(game_id)
+        if not game:
+            ic(f"Game {game_id} not found for player removal")
+            return
+
+        player = game.players.get(player_id)
+        if not player:
+            ic(f"Player {player_id} not found in game {game_id}")
+            return
+
+        # Mark player as not alive
+        player.alive = False
+        logger.info(f"Player {player_id} removed from game {game_id}")
+
+        # Check if this removal ends the game
+        survivors = [pid for pid, p in game.players.items() if p.alive]
+        if not survivors:
+            result = "draw"
+        elif len(survivors) == 1:
+            result = survivors[0]
+        else:
+            result = None
+
+        if result and result == "draw":
+            game.end_game()
+            ic("Player removal led to draw - finalizing match")
+            task = asyncio.create_task(self._finalize_match(game_id))
+            self.winner_tasks.add(task)
+            task.add_done_callback(self.winner_tasks.discard)
+        elif result:
+            game.end_game(result)
+            task = asyncio.create_task(self._declare_winner(game_id, result))
+            self.winner_tasks.add(task)
+            task.add_done_callback(self.winner_tasks.discard)
+
+        await self.broadcast_state(game_id)
+
 
 game_service = GameService()
