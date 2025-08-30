@@ -205,6 +205,15 @@ FONT_SIZE_MAP: dict[IsFocused, dict[FontSize, dict[ComponentSize, int]]] = {
 
 MODULE_SIZE = 64
 
+SCENES_IMAGES_PATH = IMAGES_PATH / "scenes"
+SCENES_IMAGE_MAP: dict[str, pygame.Surface] = {
+    "background": pygame.transform.scale(
+        pygame.image.load(SCENES_IMAGES_PATH / "background.png"),
+        (CLIENT_WIDTH, CLIENT_HEIGHT),
+    ),
+    "logo": pygame.transform.scale_by(pygame.image.load(SCENES_IMAGES_PATH / "logo.png"), 0.1),
+}
+
 # Blocks and Floors
 BLOCKS_PATH = IMAGES_PATH / "blocks"
 
@@ -216,7 +225,6 @@ FLOORS_COLORS: dict[str, pygame.Color] = {
     "shed-light": pygame.Color(23, 23, 23),
     "shed-dark": pygame.Color(5, 5, 5),
 }
-
 
 FLOORS: dict[GameTheme, list[pygame.Color]] = {
     GameTheme.DESERT: [FLOORS_COLORS["desert-light"], FLOORS_COLORS["desert-dark"]],

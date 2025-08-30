@@ -8,9 +8,9 @@ from core.constants import (
     ACCENT_BLUE,
     ACCENT_GREEN,
     ACCENT_PURPLE,
-    DARK_NAVY,
+    BLUE,
     EXPLOSION_ORANGE,
-    SLATE_GRAY,
+    SCENES_IMAGE_MAP,
     WHITE,
 )
 
@@ -31,7 +31,7 @@ class MainMenuScene(BaseScene):
         cx, cy = self.app.screen_center
         self.buttons = [
             {
-                "rect": pygame.Rect(cx - 100, int(cy * 0.85) - 30, 200, 60),
+                "rect": pygame.Rect(cx - 100, int(cy * 1.05) - 30, 200, 60),
                 "text": "JOGAR",
                 "action": self._handle_play_button,
                 "variant": "primary",
@@ -54,7 +54,7 @@ class MainMenuScene(BaseScene):
         if self.app.auth_service.is_logged_in:
             self.buttons.append(
                 {
-                    "rect": pygame.Rect(cx - 75, int(cy * 1.4) - 22, 150, 45),
+                    "rect": pygame.Rect(cx - 75, int(cy * 1.3) - 22, 150, 45),
                     "text": "Logout",
                     "action": self._handle_logout,
                     "variant": "danger",
@@ -144,20 +144,15 @@ class MainMenuScene(BaseScene):
 
     def _render_modern_background(self) -> None:
         """Renderiza background moderno com gradiente."""
-        screen_w, screen_h = self.app.screen.get_size()
+        background = SCENES_IMAGE_MAP["background"]
+        self.app.screen.blit(background, (0, 0))
 
-        # Background base
-        self.app.screen.fill(DARK_NAVY)
-
-        # Gradiente vertical otimizado
-        for y in range(0, screen_h, 4):
-            ratio = y / screen_h
-            r = int(DARK_NAVY.r + (SLATE_GRAY.r - DARK_NAVY.r) * ratio * 0.3)
-            g = int(DARK_NAVY.g + (SLATE_GRAY.g - DARK_NAVY.g) * ratio * 0.3)
-            b = int(DARK_NAVY.b + (SLATE_GRAY.b - DARK_NAVY.b) * ratio * 0.3)
-            for i in range(4):
-                if y + i < screen_h:
-                    pygame.draw.line(self.app.screen, (r, g, b), (0, y + i), (screen_w, y + i))
+        # Change the intensity of the background over time for a dynamic effect
+        elapsed = time.time() - self.start_time
+        overlay = pygame.Surface(self.app.screen.get_size(), pygame.SRCALPHA)
+        alpha = int((math.sin(elapsed * 0.5) + 1) / 2 * 25)  # Oscila entre 0 e 25
+        overlay.fill((0, 0, 0, alpha))
+        self.app.screen.blit(overlay, (0, 0))
 
     def _update_effects(self) -> None:
         """Atualiza efeitos visuais."""
@@ -216,50 +211,28 @@ class MainMenuScene(BaseScene):
 
     def _render_custom_title(self) -> None:
         """Renderiza título customizado com efeitos."""
-        # Título principal
-        title_text = "BOMB INSPER"
-        title_font = pygame.font.SysFont("Arial", 72, bold=True)
-
-        # Efeito de glow
-        for offset in [(3, 3), (-3, -3), (3, -3), (-3, 3)]:
-            glow_surface = title_font.render(title_text, True, ACCENT_BLUE)
-            glow_rect = glow_surface.get_rect(
-                center=(
-                    self.app.screen_center[0] + offset[0],
-                    int(self.app.screen_center[1] * 0.3) + offset[1],
-                )
-            )
-            self.app.screen.blit(glow_surface, glow_rect)
-
-        # Texto principal
-        title_surface = title_font.render(title_text, True, WHITE)
-        title_rect = title_surface.get_rect(
-            center=(self.app.screen_center[0], int(self.app.screen_center[1] * 0.3))
+        # Get and scale logo
+        logo = pygame.transform.scale_by(SCENES_IMAGE_MAP["logo"], 1.15)
+        logo_rect = logo.get_rect(
+            center=(self.app.screen_center[0], int(self.app.screen_center[1] * 0.5))
         )
-        self.app.screen.blit(title_surface, title_rect)
-
-        # Subtítulo
-        subtitle = "Multiplayer Bomberman Experience"
-        subtitle_font = pygame.font.SysFont("Arial", 24)
-        subtitle_surface = subtitle_font.render(subtitle, True, ACCENT_PURPLE)
-        subtitle_rect = subtitle_surface.get_rect(
-            center=(self.app.screen_center[0], int(self.app.screen_center[1] * 0.45))
-        )
-        self.app.screen.blit(subtitle_surface, subtitle_rect)
+        self.app.screen.blit(logo, logo_rect)
 
     def _render_status_info(self) -> None:
         """Renderiza informações de status do usuário."""
         if self.app.auth_service.is_logged_in and (user := self.app.auth_service.current_user):
             status_text = f"Bem-vindo, {user.username}!"
-            color = ACCENT_GREEN
+            color = BLUE
         else:
             status_text = "Clique em JOGAR para começar ou fazer login"
             color = WHITE
 
-        info_font = pygame.font.SysFont("Arial", 18)
+        # Bolder text for status
+
+        info_font = pygame.font.SysFont("Arial", 24, bold=True)
         status_surface = info_font.render(status_text, True, color)
         status_rect = status_surface.get_rect(
-            center=(self.app.screen_center[0], int(self.app.screen_center[1] * 1.6))
+            center=(self.app.screen_center[0], int(self.app.screen_center[1] * 1.63))
         )
         self.app.screen.blit(status_surface, status_rect)
 

@@ -121,7 +121,7 @@ class BombState(BaseModel):
 
 class PlayerState(BaseModel):
     username: str
-    direction_state: PlayerDirectionState
+    direction_state: PlayerDirectionState = "down"
     x: int = 0
     y: int = 0
     power_ups: list[str] = Field(default_factory=list)

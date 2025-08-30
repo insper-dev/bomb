@@ -51,7 +51,7 @@ async def matchmaking_loop() -> None:
                     p for p in [player_id1, player_id2, player_id3, player_id4] if p is not None
                 ]
 
-                match_id = await game_service.create_game(players)
+                match_id = await game_service.create_game(players, timeout=120)
 
                 wss = [waiting_players[pid] for pid in players if pid is not None]
 

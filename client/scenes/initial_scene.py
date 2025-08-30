@@ -4,7 +4,13 @@ import time
 import pygame
 
 from client.scenes.base import BaseScene, Scenes
-from core.constants import ACCENT_BLUE, ACCENT_GREEN, DARK_NAVY, EXPLOSION_ORANGE, WHITE
+from core.constants import (
+    ACCENT_BLUE,
+    ACCENT_GREEN,
+    EXPLOSION_ORANGE,
+    SCENES_IMAGE_MAP,
+    WHITE,
+)
 
 
 class InitialScene(BaseScene):
@@ -48,7 +54,6 @@ class InitialScene(BaseScene):
 
         # Componentes de texto
         self._render_title()
-        self._render_subtitle()
         self._render_instruction()
 
     def handle_event(self, event) -> None:
@@ -60,27 +65,18 @@ class InitialScene(BaseScene):
 
     def _render_title(self) -> None:
         """Renderiza título da tela."""
-        font = pygame.font.SysFont("Arial", 64, bold=True)
+        # A imagem da logo vem de cima para baixo com o tempo e para no centro
+        logo = pygame.transform.scale_by(SCENES_IMAGE_MAP["logo"], 1.15)
+        elapsed = time.time() - self.start_time
+        position = (self.title_pos[0], self.title_pos[1] - 80)
+        offset_y = max(-180, -180 + int(elapsed * 100))
 
-        # Efeito glow
-        for offset in [(4, 4), (-4, -4), (4, -4), (-4, 4)]:
-            glow_surface = font.render(self.title_text, True, ACCENT_BLUE)
-            glow_rect = glow_surface.get_rect(
-                center=(self.title_pos[0] + offset[0], self.title_pos[1] + offset[1])
-            )
-            self.app.screen.blit(glow_surface, glow_rect)
+        if offset_y >= abs(position[1] - (self.title_pos[1]) + 82):
+            offset_y = int(5 * math.sin(time.time() * 3))
 
-        # Texto principal
-        text_surface = font.render(self.title_text, True, WHITE)
-        text_rect = text_surface.get_rect(center=self.title_pos)
-        self.app.screen.blit(text_surface, text_rect)
-
-    def _render_subtitle(self) -> None:
-        """Renderiza subtítulo."""
-        font = pygame.font.SysFont("Arial", 24)
-        text_surface = font.render(self.subtitle_text, True, ACCENT_GREEN)
-        text_rect = text_surface.get_rect(center=self.subtitle_pos)
-        self.app.screen.blit(text_surface, text_rect)
+        center = (self.title_pos[0], self.title_pos[1] + offset_y)
+        logo_rect = logo.get_rect(center=center)
+        self.app.screen.blit(logo, logo_rect)
 
     def _render_instruction(self) -> None:
         """Renderiza instrução com efeito pulse."""
@@ -95,22 +91,12 @@ class InitialScene(BaseScene):
 
     def _render_modern_background(self) -> None:
         """Renderiza background moderno com gradiente."""
-        screen_w, screen_h = self.app.screen.get_size()
-
-        # Background base
-        self.app.screen.fill(DARK_NAVY)
-
-        # Gradiente radial do centro
-        cx, cy = self.app.screen_center
-        for radius in range(0, max(screen_w, screen_h) // 2, 10):
-            ratio = radius / (max(screen_w, screen_h) // 2)
-            alpha = int(30 * (1 - ratio))
-
-            if alpha > 0:
-                circle_surface = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-                color = (*ACCENT_BLUE[:3], alpha)
-                pygame.draw.circle(circle_surface, color, (radius, radius), radius)
-                self.app.screen.blit(circle_surface, (cx - radius, cy - radius))
+        background = SCENES_IMAGE_MAP["background"].copy()
+        # Fade in com o tempo
+        elapsed = time.time() - self.start_time
+        alpha = min(255, int((elapsed / 2) * 255))
+        background.set_alpha(alpha)
+        self.app.screen.blit(background, (0, 0))
 
     def _update_animations(self) -> None:
         """Atualiza animações da tela."""
