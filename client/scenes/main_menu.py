@@ -77,8 +77,8 @@ class MainMenuScene(BaseScene):
             self.app.current_scene = Scenes.LOGIN
 
     def _handle_settings(self) -> None:
-        """Handle settings button - go to login/settings."""
-        self.app.current_scene = Scenes.LOGIN
+        """Handle settings button - go to config scene."""
+        self.app.current_scene = Scenes.CONFIG
 
     def _handle_quit(self) -> None:
         """Handle quit with confirmation effect."""

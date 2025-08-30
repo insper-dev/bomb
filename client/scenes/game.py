@@ -2,6 +2,7 @@ from math import sin
 
 import pygame
 
+from client.config_manager import config_manager
 from client.game.bomb import Bomb
 from client.game.player import Player
 from client.scenes.base import BaseScene, Scenes
@@ -135,7 +136,8 @@ class GameScene(BaseScene):
             user = self.app.auth_service.current_user
             if user and user.id in self.players:
                 self.players[user.id].handle_event(event)
-            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+            # Check for pause/menu key from config
+            if config_manager.is_key_for_action(event.key, "pause"):
                 self.service.stop()
                 self.app.current_scene = Scenes.START
 

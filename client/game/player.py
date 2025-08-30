@@ -2,6 +2,7 @@ from math import sin
 
 import pygame
 
+from client.config_manager import config_manager
 from client.services.game import GameService
 from core.constants import EFFECTS, MODULE_SIZE, PLAYERS_MAP, MapBlockType
 from core.models.game import PlayerState
@@ -102,20 +103,18 @@ class Player:
         if current_time - self.last_move_time < self.move_cooldown:
             return
 
-        key_map: dict[int, PlayerDirectionState] = {
-            pygame.K_UP: "up",
-            pygame.K_DOWN: "down",
-            pygame.K_LEFT: "left",
-            pygame.K_RIGHT: "right",
-            pygame.K_w: "up",
-            pygame.K_s: "down",
-            pygame.K_a: "left",
-            pygame.K_d: "right",
-        }
+        # Use config manager for key bindings
+        direction = None
+        if config_manager.is_key_for_action(event.key, "move_up"):
+            direction = "up"
+        elif config_manager.is_key_for_action(event.key, "move_down"):
+            direction = "down"
+        elif config_manager.is_key_for_action(event.key, "move_left"):
+            direction = "left"
+        elif config_manager.is_key_for_action(event.key, "move_right"):
+            direction = "right"
 
-        if event.key in key_map:
-            direction = key_map[event.key]
-
+        if direction:
             # Validação de movimento antes de enviar
             if self._can_move(direction):
                 # Predição local mais conservadora
@@ -129,7 +128,7 @@ class Player:
                 # Limpa movimentos antigos do buffer
                 self._clean_pending_moves(current_time)
 
-        elif event.key == pygame.K_SPACE:
+        elif config_manager.is_key_for_action(event.key, "place_bomb"):
             # Throttling para bombas também
             if current_time - self.last_move_time < self.move_cooldown // 2:
                 return
