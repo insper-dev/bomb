@@ -1,9 +1,9 @@
+import time
 from math import sin
 
 import pygame
 
 from client.config_manager import config_manager
-from client.game.bomb import Bomb
 from client.game.player import Player
 from client.scenes.base import BaseScene, Scenes
 from client.services.game import GameService
@@ -20,6 +20,7 @@ from core.constants import (
     ACCENT_RED,
     ACCENT_YELLOW,
     BLOCKS,
+    BOMB_COKING,
     DARK_NAVY,
     EARTH,
     EXPLOSION_ORANGE,
@@ -69,7 +70,7 @@ class GameScene(BaseScene):
         }
 
         # instancia bombas
-        self.bombs = []  # Lista para gerenciar bombas ativas
+        self.bombs: list[tuple[str, int | float]] = []  # Lista para gerenciar bombas ativas
 
         # Tema atual do jogo
         self.theme = self.service.state.game_theme
@@ -273,19 +274,46 @@ class GameScene(BaseScene):
         for pstate in self.state.players.values():
             for bomb in pstate.bombs:
                 if bomb.exploded_at is None:
-                    if not any(
-                        b.position[0] == bomb.x and b.position[1] == bomb.y for b in self.bombs
-                    ):
-                        new_bomb = Bomb(
-                            screen,
-                            (bomb.x, bomb.y),
-                            self.margin,
-                            bomb.id,
-                            explosion_time=pstate.bomb_delay,
-                        )
+                    if bomb.id not in self.bombs:
+                        new_bomb = (bomb.id, time.time() + pstate.bomb_delay)
                         self.bombs.append(new_bomb)
+
         for bomb in self.bombs:
-            bomb.render()
+            bomb_id = bomb[0]
+            bomb_end_time = bomb[1]
+            time_left = bomb_end_time - time.time()
+
+            if time_left <= 0:
+                self.bombs = [b for b in self.bombs if bomb[0] != bomb_id]
+                continue
+
+            # Posição da bomba
+            bomb_obj = None
+            for pstate in self.state.players.values():
+                for b in pstate.bombs:
+                    if b.id == bomb_id:
+                        bomb_obj = b
+                        break
+                if bomb_obj:
+                    break
+
+            if not bomb_obj:
+                continue
+
+            cx = self.margin[0] + bomb_obj.x * MODULE_SIZE
+            cy = self.margin[1] + bomb_obj.y * MODULE_SIZE
+
+            pstate = next(
+                (p for p in self.state.players.values() if bomb_id in [b.id for b in p.bombs]),
+                None,
+            )
+            if not pstate:
+                continue
+
+            bomb_sprites = BOMB_COKING
+            quantity = len(bomb_sprites)
+            index = min(int((1 - time_left / pstate.bomb_delay) * quantity), quantity - 1)
+            screen.blit(bomb_sprites[index], (cx, cy))
 
     def _render_explosions_enhanced(self, screen: pygame.Surface) -> None:
         """Explosões com efeitos de partículas melhorados."""
@@ -300,7 +328,7 @@ class GameScene(BaseScene):
                     cx = self.margin[0] + bomb.x * MODULE_SIZE
                     cy = self.margin[1] + bomb.y * MODULE_SIZE
 
-                    self.bombs = [b for b in self.bombs if b.id != bomb.id]
+                    self.bombs = [b for b in self.bombs if b[0] != bomb.id]
 
                     # Toca som de explosão
                     explosion_sound = pygame.mixer.Sound(SOUNDS["bomb_explosion"])
