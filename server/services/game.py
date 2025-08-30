@@ -47,16 +47,14 @@ class GameService:
         if len(players) < 3:
             positions = [max(positions), min(positions)]
 
-        skins = ["carlitos", "rogerio", "claudio"]
-        if len(players) <= 4:
-            skins.append(random.choice(["carlitos", "rogerio", "claudio"]))
+        skins = ["carlitos", "rogerio", "claudio", "daniel"]
 
         for i, player in enumerate(players):
             skin = random.choice(skins)
             skins.remove(skin)
             x, y = positions[i] if i < len(positions) else (0, 0)
             game.players[player.id] = PlayerState(
-                username=player.username, direction_state="stand_by", x=x, y=y, skin=skin
+                username=player.username, direction_state="down", x=x, y=y, skin=skin
             )
             ic(player, x, y)
 

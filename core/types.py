@@ -13,7 +13,7 @@ type FontStyle = Literal["normal", "bold", "italic", "bold_italic"]
 type FontSize = Literal["standard", "title", "subtitle", "text"]
 type ParticleType = Literal["geo", "tip", "tail"]
 type PlayerDirectionState = Literal["up", "down", "left", "right", "stand_by"]
-type PlayerType = Literal["carlitos", "rogerio", "claudio"]
+type PlayerType = Literal["carlitos", "rogerio", "claudio", "daniel"]
 
 __all__ = [
     "ComponentSize",
