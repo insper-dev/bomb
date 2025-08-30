@@ -10,7 +10,7 @@ from core.constants import ACCENT_BLUE, ACCENT_GREEN, DARK_NAVY, EXPLOSION_ORANG
 class StartScene(BaseScene):
     """Tela de splash moderna com transições animadas."""
 
-    TRANSITION_TIME = 1200  # Tempo mais longo para melhor experiência
+    TRANSITION_TIME = 2000  # Tempo mais longo para melhor experiência
 
     def __init__(self, app) -> None:
         super().__init__(app)
@@ -31,9 +31,10 @@ class StartScene(BaseScene):
         cx, cy = self.app.screen_center
         self.text_pos = (cx, cy)
         self.texts = [
-            "Pygame Community",
-            "Moriaty",
-            "Margenta Production",
+            "With Pygame Community",
+            "From Margenta Production",
+            ["Images by Arak", "@arak_in_arts", "arakinarts@gmail.com"],
+            ["Sounds and Music by Finx", "@Finx212", "finx2616@gmail.com"],
         ]
 
     def render(self) -> None:
@@ -108,12 +109,18 @@ class StartScene(BaseScene):
             pulse = 1 + 0.1 * math.sin(time.time() * 4)
             font_size = int(42 * pulse)
             font = pygame.font.SysFont("Arial", font_size, bold=True)
+            text_surface = font.render(current_text[0], True, WHITE)
 
         # Texto principal com alpha
-        text_surface = font.render(current_text, True, WHITE)
-        text_surface.set_alpha(self.fade_alpha)
-        text_rect = text_surface.get_rect(center=self.text_pos)
-        self.app.screen.blit(text_surface, text_rect)
+        for i, text in enumerate(
+            current_text if isinstance(current_text, list) else [current_text]
+        ):
+            text_surface = font.render(text, True, WHITE)
+            text_surface.set_alpha(self.fade_alpha)
+            text_rect = text_surface.get_rect(
+                center=(self.text_pos[0], self.text_pos[1] + i * 50 - 25)
+            )
+            self.app.screen.blit(text_surface, text_rect)
 
     def _render_modern_background(self) -> None:
         """Renderiza background moderno com gradiente."""
