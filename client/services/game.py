@@ -8,7 +8,7 @@ from websockets import ClientConnection, ConnectionClosed, connect
 
 from client.services.base import ServiceBase
 from core.models.game import BombState, GameState, GameStatus
-from core.models.ws import CollectPowerUpEvent, MovimentEvent, PlaceBombEvent
+from core.models.ws import CollectPowerUpEvent, LeaveMatchEvent, MovimentEvent, PlaceBombEvent
 from core.serialization import unpack_game_state
 from core.ssl_config import get_websocket_ssl_context
 from core.types import PlayerDirectionState
@@ -212,6 +212,20 @@ class GameService(ServiceBase):
         # Envia para servidor com prioridade alta
         ev = PlaceBombEvent(x=bomb.x, y=bomb.y)
         self._queue_message(ev.model_dump_json(), high_priority=True)
+
+    def exit_game(self) -> None:
+        """Send exit game event and stop the service."""
+        if not (self.running and self.websocket and self._loop):
+            return
+        user = self.app.auth_service.current_user
+        if not user:
+            return
+
+        if self.match_id:
+            ev = LeaveMatchEvent(player=user.id)
+            self._queue_message(ev.model_dump_json(), high_priority=True)
+
+        self.stop()
 
     def _queue_message(self, message: str, high_priority: bool = False) -> None:
         """Enfileira mensagem para envio otimizado."""

@@ -1,6 +1,6 @@
 {
-  "master_volume": 45,
-  "music_volume": 45,
+  "master_volume": 90,
+  "music_volume": 55,
   "sfx_volume": 80,
   "key_bindings": {
     "move_up": [
@@ -20,7 +20,7 @@
       100
     ],
     "place_bomb": [
-      112
+      32
     ],
     "pause": [
       27
